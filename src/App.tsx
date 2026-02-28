@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import EfficiencyCheck from "./pages/EfficiencyCheck";
 import AdvancedCheck from "./pages/AdvancedCheck";
 import Results from "./pages/Results";
+import Impressum from "./pages/Impressum";
+import Datenschutz from "./pages/Datenschutz";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +24,8 @@ const App = () => (
           <Route path="/efficiency-check" element={<EfficiencyCheck />} />
           <Route path="/advanced-check" element={<AdvancedCheck />} />
           <Route path="/results" element={<Results />} />
+          <Route path="/impressum" element={<Impressum />} />
+          <Route path="/datenschutz" element={<Datenschutz />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
