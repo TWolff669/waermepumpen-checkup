@@ -193,7 +193,10 @@ const ScenarioSimulator = ({
               {/* Cost breakdown chart */}
               {szenario.ausgewaehlteMassnahmen.length > 1 && (
                 <div className="mb-6">
-                  <p className="text-xs font-semibold text-foreground mb-2">Kostenverteilung (Mittelwert)</p>
+                  <p className="text-xs font-semibold text-foreground mb-1">Kostenverteilung (Mittelwert)</p>
+                  <p className="text-[10px] text-muted-foreground mb-3">
+                    Vergleich der geschätzten Investitionskosten (Mittelwert aus Min/Max) mit der jährlichen Stromkostenersparnis je Maßnahme.
+                  </p>
                   <ResponsiveContainer width="100%" height={Math.max(120, szenario.ausgewaehlteMassnahmen.length * 36)}>
                     <BarChart
                       data={szenario.ausgewaehlteMassnahmen.map(m => ({
@@ -209,12 +212,23 @@ const ScenarioSimulator = ({
                       <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 9, fill: "hsl(var(--foreground))" }} />
                       <Tooltip
                         contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", fontSize: 12 }}
-                        formatter={(v: number, name: string) => [`${v.toLocaleString()}€`, name === "kosten" ? "Investition" : "Ersparnis/Jahr"]}
+                        formatter={(v: number, name: string) => [`${v.toLocaleString()}€`, name === "kosten" ? "Investition (einmalig)" : "Ersparnis (pro Jahr)"]}
                       />
                       <Bar dataKey="kosten" fill="hsl(var(--primary))" radius={[0, 3, 3, 0]} barSize={14} name="kosten" />
                       <Bar dataKey="ersparnis" fill="hsl(var(--success))" radius={[0, 3, 3, 0]} barSize={14} name="ersparnis" />
                     </BarChart>
                   </ResponsiveContainer>
+                  {/* Legende */}
+                  <div className="flex items-center gap-4 mt-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-sm bg-primary" />
+                      <span className="text-[10px] text-muted-foreground">Investition (einmalig)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-sm bg-success" />
+                      <span className="text-[10px] text-muted-foreground">Ersparnis (pro Jahr)</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
