@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { runSimulation, type SimulationResult, type SimulationInput } from "@/lib/simulation";
+import { exportResultsPDF } from "@/lib/pdf-export";
 
 const ResultsPage = () => {
   const navigate = useNavigate();
@@ -183,8 +184,8 @@ const ResultsPage = () => {
                 <Link to="/advanced-check"><Settings2 className="mr-1 h-4 w-4" /> Check verfeinern</Link>
               </Button>
             )}
-            <Button variant="hero" onClick={() => window.print()}>
-              <Download className="mr-1 h-4 w-4" /> Ergebnis speichern
+            <Button variant="hero" onClick={() => exportResultsPDF(result)}>
+              <Download className="mr-1 h-4 w-4" /> Als PDF herunterladen
             </Button>
           </div>
         </motion.div>
