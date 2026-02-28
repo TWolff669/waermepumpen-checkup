@@ -12,18 +12,34 @@ import { getClimateData } from "./climate-data";
 
 // ─── Building parameters ───────────────────────────────────────────
 
-/** Specific heat demand (kWh/m²·a) by building type and renovation state */
+/** Base specific heat demand (kWh/m²·a) by construction year */
+function getBaseDemandByBaujahr(baujahr: string): number {
+  switch (baujahr) {
+    case "vor1960":    return 180; // Ungedämmt, einschalig
+    case "1960-1978":  return 150; // Erste Dämmansätze
+    case "1979-1995":  return 120; // 1. WSchV
+    case "1996-2002":  return 90;  // 2./3. WSchV
+    case "2003-2015":  return 65;  // EnEV
+    case "ab2016":     return 40;  // EnEV 2016 / GEG
+    default:           return 130; // Fallback Altbau
+  }
+}
+
+/** Specific heat demand (kWh/m²·a) by building type, construction year and renovation state */
 function getSpecificHeatDemand(
   gebaeudetyp: string,
-  renovierungen: string[]
+  renovierungen: string[],
+  baujahr: string
 ): number {
   if (gebaeudetyp === "neubau") {
-    // KfW55 / GEG 2024 standard
-    return 40;
+    // Neubau: Baujahr determines standard
+    if (baujahr === "ab2016") return 35;
+    if (baujahr === "2003-2015") return 50;
+    return 40; // KfW55 / GEG default
   }
 
-  // Altbau base: unrenovated ~150 kWh/m²·a
-  let demand = 150;
+  // Altbau: base from construction year
+  let demand = getBaseDemandByBaujahr(baujahr);
 
   // Each renovation measure reduces demand
   if (renovierungen.includes("dach")) demand -= 20;
@@ -31,7 +47,9 @@ function getSpecificHeatDemand(
   if (renovierungen.includes("fassade")) demand -= 35;
   if (renovierungen.includes("kellerdecke")) demand -= 12;
 
-  return Math.max(demand, 45); // Fully renovated Altbau won't go below ~45
+  // Floor: can't go below well-renovated level for that era
+  const minDemand = gebaeudetyp === "neubau" ? 35 : 45;
+  return Math.max(demand, minDemand);
 }
 
 /** Climate correction factor: ratio of local HGT to reference (3400 Kd) */
@@ -221,6 +239,7 @@ export interface SimulationInput {
   postleitzahl: string;
   beheizteFlaeche: string;
   gebaeudetyp: string;
+  baujahr: string;
   renovierungen: string[];
   wpLeistung: string;
   personenAnzahl: string;
@@ -299,7 +318,8 @@ export function runSimulation(input: SimulationInput): SimulationResult {
   // ── Building heat demand ──
   const specificDemand = getSpecificHeatDemand(
     input.gebaeudetyp || "altbau",
-    input.renovierungen || []
+    input.renovierungen || [],
+    input.baujahr || ""
   );
   let heatingDemand = specificDemand * flaeche * climateFactor;
 
