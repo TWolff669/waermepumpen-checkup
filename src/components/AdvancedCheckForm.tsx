@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useNavigate } from "react-router-dom";
+import InfoTooltip from "@/components/InfoTooltip";
 
 interface AdvancedFormData {
   vorlauftemperatur: string;
@@ -107,7 +108,7 @@ const AdvancedCheckForm = () => {
                   <h2 className="text-2xl font-bold text-card-foreground">Heizkreis-Details</h2>
                   <div className="grid gap-5">
                     <div>
-                      <Label htmlFor="vorlauf">Maximale Vorlauftemperatur Heizung (°C)</Label>
+                      <Label htmlFor="vorlauf"><InfoTooltip term="Vorlauftemperatur">Maximale Vorlauftemperatur Heizung (°C)</InfoTooltip></Label>
                       <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">
                         Typisch: 35°C bei Fußbodenheizung, 42°C bei WP-Heizkörpern, 55°C bei Bestandsheizkörpern
                       </p>
@@ -134,7 +135,7 @@ const AdvancedCheckForm = () => {
                       </div>
                     </div>
                     <div>
-                      <Label>Wärmepumpenheizkörper vorhanden?</Label>
+                      <Label><InfoTooltip term="WP-Heizkörper">Wärmepumpenheizkörper vorhanden?</InfoTooltip></Label>
                       <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">
                         Speziell für Wärmepumpen ausgelegte Heizkörper mit großer Oberfläche
                       </p>
@@ -225,7 +226,7 @@ const AdvancedCheckForm = () => {
                       </div>
                     </div>
                     <div>
-                      <Label>Automatische Raumregler / Thermostate vorhanden?</Label>
+                      <Label><InfoTooltip term="Automatische Raumregler">Automatische Raumregler / Thermostate vorhanden?</InfoTooltip></Label>
                       <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">
                         Smarte oder programmierbare Thermostate an den Heizkörpern
                       </p>

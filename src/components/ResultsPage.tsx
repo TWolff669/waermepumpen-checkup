@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { runSimulation, type SimulationResult, type SimulationInput } from "@/lib/simulation";
 import { exportResultsPDF } from "@/lib/pdf-export";
+import InfoTooltip from "@/components/InfoTooltip";
 
 const ResultsPage = () => {
   const navigate = useNavigate();
@@ -127,7 +128,7 @@ const ResultsPage = () => {
                       <m.icon className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">{m.label}</p>
+                      <p className="text-xs text-muted-foreground"><InfoTooltip term={m.label}>{m.label}</InfoTooltip></p>
                       <p className="text-xl font-bold font-mono text-foreground leading-tight">
                         {m.value}<span className="text-sm text-muted-foreground ml-0.5">{m.unit}</span>
                       </p>
