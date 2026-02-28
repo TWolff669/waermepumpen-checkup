@@ -61,6 +61,11 @@ const glossary: Record<string, { short: string; detail: string }> = {
     detail:
       "Automatische Raumregler (smarte Thermostate) ermöglichen raumweise Zeitprogramme, automatische Nachtabsenkung und Absenkung bei Abwesenheit. Sie kommunizieren per Funk mit der Heizungssteuerung und sparen ca. 5–10% Energie. Kosten: 50–80€ pro Heizkörper. Bei Fußbodenheizung regeln sie einzelne Heizkreise.",
   },
+  Abrechnungszeitraum: {
+    short: "Zeitraum, auf den sich Ihre Verbrauchsdaten beziehen",
+    detail:
+      "Geben Sie den exakten Zeitraum Ihrer Stromabrechnung oder Ihres Zähler-Ablesezeitraums an. Bei weniger als 12 Monaten rechnet die Simulation den Verbrauch automatisch aufs Jahr hoch — gewichtet nach Heizgradtagen, damit Sommer- und Wintermonate korrekt berücksichtigt werden. Ein volles Jahr (z.B. Jan–Dez) liefert die genauesten Ergebnisse.",
+  },
 };
 
 const InfoTooltip = ({ term, children }: InfoTooltipProps) => {

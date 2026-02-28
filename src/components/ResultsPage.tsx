@@ -202,10 +202,15 @@ const ResultsPage = () => {
                 <p className="text-xs text-muted-foreground">kWh/Jahr</p>
               </div>
             </div>
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center space-y-1">
               <span className={`text-sm font-medium ${result.deviation > 0 ? "text-destructive" : "text-success"}`}>
                 {result.deviation > 0 ? "+" : ""}{result.deviation}% Abweichung
               </span>
+              {result.isPartialPeriod && (
+                <p className="text-[10px] text-muted-foreground">
+                  ⚠ Verbrauchsdaten aus {result.measurementDays} Tagen auf 12 Monate hochgerechnet (HGT-gewichtet)
+                </p>
+              )}
             </div>
           </div>
 

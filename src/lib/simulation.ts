@@ -156,6 +156,65 @@ function estimateVorlauftemperatur(
   return 55; // Bestandsheizkörper
 }
 
+// ─── Monthly heating degree day distribution ──────────────────────
+// Fraction of annual HGT per month (Germany average, DWD data)
+// Used to weight partial-year consumption for annualization.
+const MONTHLY_HGT_FRACTION = [
+  0.17,  // Jan
+  0.14,  // Feb
+  0.11,  // Mar
+  0.07,  // Apr
+  0.02,  // May
+  0.00,  // Jun
+  0.00,  // Jul
+  0.00,  // Aug
+  0.02,  // Sep
+  0.08,  // Oct
+  0.13,  // Nov
+  0.16,  // Dec
+];  // sum ≈ 0.90 (remaining 0.10 is base hot water load)
+
+/**
+ * Annualize partial-year consumption using heating degree day weighting.
+ * If dates cover a full year, returns the raw value.
+ * For partial periods, it calculates what fraction of annual heating load
+ * falls within the given period and extrapolates accordingly.
+ */
+function annualizeConsumption(
+  consumption: number,
+  von?: string,
+  bis?: string
+): { annualized: number; days: number; isPartial: boolean } {
+  if (!von || !bis) return { annualized: consumption, days: 365, isPartial: false };
+
+  const startDate = new Date(von);
+  const endDate = new Date(bis);
+  const days = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (days <= 0) return { annualized: consumption, days: 0, isPartial: false };
+  if (days >= 350) return { annualized: consumption, days, isPartial: false };
+
+  // Calculate HGT fraction for the covered period
+  // Walk through each day and accumulate the monthly HGT fraction
+  let coveredFraction = 0;
+  const current = new Date(startDate);
+  while (current < endDate) {
+    const month = current.getMonth();
+    // Each day in a month contributes its share of that month's HGT
+    const daysInMonth = new Date(current.getFullYear(), month + 1, 0).getDate();
+    // HGT fraction + base load fraction (hot water is ~10% spread evenly)
+    const dailyFraction = (MONTHLY_HGT_FRACTION[month] + 0.10 / 12) / daysInMonth;
+    coveredFraction += dailyFraction;
+    current.setDate(current.getDate() + 1);
+  }
+
+  // Prevent division by very small numbers
+  coveredFraction = Math.max(coveredFraction, 0.05);
+
+  const annualized = Math.round(consumption / coveredFraction);
+  return { annualized, days, isPartial: true };
+}
+
 // ─── Main simulation ──────────────────────────────────────────────
 
 export interface SimulationInput {
@@ -172,6 +231,8 @@ export interface SimulationInput {
   gesamtverbrauch: string;
   gesamtproduktion: string;
   abrechnungVorhanden: string;
+  abrechnungVon?: string;
+  abrechnungBis?: string;
   // Advanced fields (optional)
   vorlauftemperatur?: string;
   wpHeizkoerper?: string;
@@ -206,6 +267,10 @@ export interface SimulationResult {
   climateRegion: string;
   /** Flow temperature used °C */
   vorlauftemperatur: number;
+  /** Whether consumption was annualized from partial period */
+  isPartialPeriod: boolean;
+  /** Number of days in the measurement period */
+  measurementDays: number;
   /** Personalized recommendations */
   recommendations: Recommendation[];
 }
@@ -278,11 +343,24 @@ export function runSimulation(input: SimulationInput): SimulationResult {
   const stromWarmwasser = hotWaterDemand / jazWW;
   const simulatedConsumption = Math.round(stromHeizung + stromWarmwasser);
 
-  // ── Comparison with actual ──
+  // ── Comparison with actual (with annualization) ──
   const hasActual = input.abrechnungVorhanden === "ja" && Number(input.gesamtverbrauch) > 0;
-  const actualConsumption = hasActual
-    ? Number(input.gesamtverbrauch)
-    : Math.round(simulatedConsumption * (1 + (Math.random() * 0.3 - 0.05)));
+  let actualConsumption: number;
+  let isPartialPeriod = false;
+  let measurementDays = 365;
+
+  if (hasActual) {
+    const { annualized, days, isPartial } = annualizeConsumption(
+      Number(input.gesamtverbrauch),
+      input.abrechnungVon,
+      input.abrechnungBis
+    );
+    actualConsumption = annualized;
+    isPartialPeriod = isPartial;
+    measurementDays = days;
+  } else {
+    actualConsumption = Math.round(simulatedConsumption * (1 + (Math.random() * 0.3 - 0.05)));
+  }
 
   const deviation = Math.round(
     ((actualConsumption - simulatedConsumption) / simulatedConsumption) * 100
@@ -314,6 +392,8 @@ export function runSimulation(input: SimulationInput): SimulationResult {
     specificHeatDemand: Math.round(specificDemand),
     climateRegion: climate.region,
     vorlauftemperatur: vorlauftemp,
+    isPartialPeriod,
+    measurementDays,
     recommendations,
   };
 }
