@@ -449,6 +449,55 @@ const ResultsPage = () => {
             </div>
           )}
 
+          {/* Upselling: Vertiefte Analyse + Speichern */}
+          {!result.isAdvanced && (
+            <div className="bg-gradient-to-br from-primary/5 via-card to-success/5 rounded-xl border border-primary/20 p-6 mb-8">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 flex-shrink-0">
+                  <Settings2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Vertiefte Analyse verfügbar</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Optimieren Sie Ihr Ergebnis mit zusätzlichen Parametern für eine genauere Bewertung.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                <div className="flex items-start gap-2 p-2.5 bg-card/80 rounded-lg">
+                  <Thermometer className="h-3.5 w-3.5 text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-foreground">Vorlauftemperatur, Raumregelung & Heizkörper-Analyse</p>
+                </div>
+                <div className="flex items-start gap-2 p-2.5 bg-card/80 rounded-lg">
+                  <Droplets className="h-3.5 w-3.5 text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-foreground">Warmwasser-Verbrauch & Duschverhalten</p>
+                </div>
+                <div className="flex items-start gap-2 p-2.5 bg-card/80 rounded-lg">
+                  <Zap className="h-3.5 w-3.5 text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-foreground">Heizstab-Analyse mit Leistung & Betriebsstunden</p>
+                </div>
+                <div className="flex items-start gap-2 p-2.5 bg-card/80 rounded-lg">
+                  <Sun className="h-3.5 w-3.5 text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-foreground">PV-Anlage & Batteriespeicher Einbindung</p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="hero" className="flex-1" asChild>
+                  <Link to="/advanced-check">
+                    <Settings2 className="mr-1.5 h-4 w-4" /> Vertiefte Analyse starten
+                  </Link>
+                </Button>
+                {!user && (
+                  <Button variant="outline" className="flex-1" asChild>
+                    <Link to="/auth">
+                      <Save className="mr-1.5 h-4 w-4" /> Kostenlos anmelden & speichern
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Disclaimer */}
           <p className="text-xs text-muted-foreground text-center mb-6">
             Hinweis: Diese Ergebnisse basieren auf einer vereinfachten Simulation nach VDI 4650 / DIN V 18599 und ersetzen keine professionelle Beratung durch einen Energieberater oder Fachplaner.
@@ -459,20 +508,10 @@ const ResultsPage = () => {
             <Button variant="outline" asChild>
               <Link to="/efficiency-check"><RotateCcw className="mr-1 h-4 w-4" /> Neuen Check starten</Link>
             </Button>
-            {!result.isAdvanced && hasComparison && Math.abs(result.deviation) > 10 && (
-              <Button variant="default" asChild>
-                <Link to="/advanced-check"><Settings2 className="mr-1 h-4 w-4" /> Check verfeinern</Link>
-              </Button>
-            )}
             {user && inputData && (
               <Button variant="default" onClick={() => setSaveDialogOpen(true)}>
                 <Save className="mr-1 h-4 w-4" />
                 {linkedProjectId ? `Check zu "${linkedProjectName}" hinzufügen` : "Projekt speichern"}
-              </Button>
-            )}
-            {!user && (
-              <Button variant="outline" asChild>
-                <Link to="/auth">Anmelden um Ergebnisse zu speichern</Link>
               </Button>
             )}
             <Button variant="hero" onClick={() => exportResultsPDF(result, inputData ?? undefined)}>
