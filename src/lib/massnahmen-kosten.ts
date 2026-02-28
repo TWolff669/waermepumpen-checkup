@@ -49,9 +49,9 @@ export const DEFAULT_MASSNAHMEN_KOSTEN: MassnahmeKosten[] = [
   {
     id: "heizkoerper_tausch",
     label: "Heizkörper gegen WP-Heizkörper tauschen",
-    // Brutto-Listenpreise +55% ≈ Lieferung inkl. Montage (Erfahrungswerte 2024/25)
-    kostenMin: 1240,  // 800 * 1.55
-    kostenMax: 3100,  // 2000 * 1.55
+    // Brutto-Listenpreise +45% ≈ Lieferung inkl. Montage (Erfahrungswerte 2024/25)
+    kostenMin: 1160,  // 800 * 1.45
+    kostenMax: 2900,  // 2000 * 1.45
     einheit: "pro Stück",
     effizienzgewinnProzent: 18,
     stromersparnisKwhBasis: 700,
