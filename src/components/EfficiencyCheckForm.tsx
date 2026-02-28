@@ -19,6 +19,7 @@ interface FormData {
   postleitzahl: string;
   beheizteFlaeche: string;
   gebaeudetyp: string;
+  baujahr: string;
   renovierungen: string[];
   wpLeistung: string;
   hersteller: string;
@@ -38,6 +39,7 @@ const initialData: FormData = {
   postleitzahl: "",
   beheizteFlaeche: "",
   gebaeudetyp: "",
+  baujahr: "",
   renovierungen: [],
   wpLeistung: "",
   hersteller: "",
@@ -166,6 +168,26 @@ const EfficiencyCheckForm = () => {
                         </div>
                       </RadioGroup>
                     </div>
+                    {data.gebaeudetyp && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-1">
+                        <Label htmlFor="baujahr">
+                          <InfoTooltip term="Baujahr">Baujahr des Gebäudes</InfoTooltip>
+                        </Label>
+                        <Select value={data.baujahr} onValueChange={(v) => update("baujahr", v)}>
+                          <SelectTrigger className="mt-1.5">
+                            <SelectValue placeholder="Baujahr wählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="vor1960">Vor 1960</SelectItem>
+                            <SelectItem value="1960-1978">1960–1978</SelectItem>
+                            <SelectItem value="1979-1995">1979–1995 (1. WSchV)</SelectItem>
+                            <SelectItem value="1996-2002">1996–2002 (2./3. WSchV)</SelectItem>
+                            <SelectItem value="2003-2015">2003–2015 (EnEV)</SelectItem>
+                            <SelectItem value="ab2016">Ab 2016 (EnEV 2016 / GEG)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </motion.div>
+                    )}
                     {data.gebaeudetyp === "altbau" && (
                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-3">
                         <Label>Durchgeführte Sanierungen</Label>

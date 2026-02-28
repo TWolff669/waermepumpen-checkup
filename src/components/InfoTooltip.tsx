@@ -66,6 +66,11 @@ const glossary: Record<string, { short: string; detail: string }> = {
     detail:
       "Geben Sie den exakten Zeitraum Ihrer Stromabrechnung oder Ihres Zähler-Ablesezeitraums an. Bei weniger als 12 Monaten rechnet die Simulation den Verbrauch automatisch aufs Jahr hoch — gewichtet nach Heizgradtagen, damit Sommer- und Wintermonate korrekt berücksichtigt werden. Ein volles Jahr (z.B. Jan–Dez) liefert die genauesten Ergebnisse.",
   },
+  Baujahr: {
+    short: "Baujahr bestimmt den energetischen Standard des Gebäudes",
+    detail:
+      "Das Baujahr gibt Aufschluss über den ursprünglichen Dämmstandard. Vor 1978 gab es keine Wärmeschutz­verordnung — diese Gebäude haben typisch 150–200 kWh/m²·a Heizwärmebedarf. Mit jeder Verschärfung (1. WSchV 1978, EnEV 2002, GEG 2020) sank der Standard erheblich. Ein Neubau ab 2016 braucht nur noch ca. 35–50 kWh/m²·a. Das Baujahr beeinflusst direkt, wie effizient die Wärmepumpe arbeiten kann.",
+  },
 };
 
 const InfoTooltip = ({ term, children }: InfoTooltipProps) => {
