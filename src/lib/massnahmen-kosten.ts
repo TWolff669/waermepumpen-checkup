@@ -15,6 +15,21 @@ export interface MassnahmeKosten {
   /** Geschätzte jährliche Stromersparnis in kWh (pro 100m² / Standardfall) */
   stromersparnisKwhBasis: number;
   kategorie: string;
+  /** Wenn true: Kosten sind pro Stück, Menge wird dynamisch berechnet */
+  istProStueck?: boolean;
+}
+
+/**
+ * Berechnet die Anzahl WP-Heizkörper nach Näherungsformel:
+ * Mittelwert aus (beheizteFlaeche / 40) und (personenAnzahl * 1.5),
+ * aufgerundet auf nächste 0,5.
+ */
+export function berechneHeizkörperAnzahl(flaecheM2: number, personenAnzahl: number): number {
+  const nachFlaeche = flaecheM2 / 40;
+  const nachPersonen = personenAnzahl * 1.5;
+  const mittelwert = (nachFlaeche + nachPersonen) / 2;
+  // Aufrunden auf nächste 0,5
+  return Math.ceil(mittelwert * 2) / 2;
 }
 
 /**
@@ -34,12 +49,15 @@ export const DEFAULT_MASSNAHMEN_KOSTEN: MassnahmeKosten[] = [
   {
     id: "heizkoerper_tausch",
     label: "Heizkörper gegen WP-Heizkörper tauschen",
-    kostenMin: 800,
-    kostenMax: 2000,
-    einheit: "pro Stück (2-4 Stück typisch)",
+    // Brutto-Listenpreise +55% ≈ Lieferung inkl. Montage (Erfahrungswerte 2024/25)
+    kostenMin: 1240,  // 800 * 1.55
+    kostenMax: 3100,  // 2000 * 1.55
+    einheit: "pro Stück",
     effizienzgewinnProzent: 18,
     stromersparnisKwhBasis: 700,
     kategorie: "Investition",
+    /** Dynamische Stückzahl: siehe berechneHeizkörperAnzahl() */
+    istProStueck: true,
   },
   {
     id: "vorlauftemperatur_senken",
@@ -266,9 +284,11 @@ export function berechneSzenario(
   aktuellerVerbrauch: number, // kWh/a
   aktuelleJAZ: number,
   flaecheM2: number,
+  personenAnzahl: number = 4,
 ): SzenarioErgebnis {
   // Scale factor based on actual building size vs. reference (120m²)
   const skalierung = Math.max(0.5, Math.min(2.0, flaecheM2 / 120));
+  const hkAnzahl = berechneHeizkörperAnzahl(flaecheM2, personenAnzahl);
 
   let gesamtMin = 0;
   let gesamtMax = 0;
@@ -277,8 +297,10 @@ export function berechneSzenario(
   const details: SzenarioErgebnis["ausgewaehlteMassnahmen"] = [];
 
   for (const m of selectedMassnahmen) {
-    const kMin = m.kostenMin;
-    const kMax = m.kostenMax;
+    // Pro-Stück-Maßnahmen (z.B. Heizkörper) mit dynamischer Stückzahl
+    const anzahl = m.istProStueck ? hkAnzahl : 1;
+    const kMin = Math.round(m.kostenMin * anzahl);
+    const kMax = Math.round(m.kostenMax * anzahl);
     const ersparnisKwh = Math.round(m.stromersparnisKwhBasis * skalierung);
     const ersparnisEuro = Math.round(ersparnisKwh * strompreis);
 
@@ -288,11 +310,12 @@ export function berechneSzenario(
     // Diminishing returns for combined efficiency gains
     effizienzGesamt = effizienzGesamt + m.effizienzgewinnProzent * (1 - effizienzGesamt / 100);
 
+    const einheitLabel = m.istProStueck ? `${anzahl} Stück (berechnet)` : m.einheit;
     details.push({
       label: m.label,
       kostenMin: kMin,
       kostenMax: kMax,
-      einheit: m.einheit,
+      einheit: einheitLabel,
       stromersparnisKwh: ersparnisKwh,
       kostenersparnisEuro: ersparnisEuro,
     });
