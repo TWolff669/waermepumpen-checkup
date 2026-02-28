@@ -65,22 +65,93 @@ const ResultsPage = () => {
             <p className="text-xs text-muted-foreground mt-3">Klimaregion: {result.climateRegion}</p>
           </div>
 
-          {/* Technical Details */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-            {[
-              { icon: Zap, label: "JAZ Heizung", value: (result.jaz ?? 0).toFixed(2), unit: "" },
-              { icon: Droplets, label: "JAZ Warmwasser", value: (result.jazWarmwasser ?? 0).toFixed(2), unit: "" },
-              { icon: Thermometer, label: "Vorlauftemp.", value: `${result.vorlauftemperatur ?? 0}`, unit: "°C" },
-              { icon: Home, label: "Heizwärmebedarf", value: `${result.specificHeatDemand ?? 0}`, unit: "kWh/m²" },
-            ].map((item) => (
-              <div key={item.label} className="bg-card rounded-lg border border-border p-4 text-center shadow-card">
-                <item.icon className="h-4 w-4 text-primary mx-auto mb-1.5" />
-                <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-                <p className="text-lg font-bold font-mono text-foreground">
-                  {item.value}<span className="text-xs text-muted-foreground ml-0.5">{item.unit}</span>
-                </p>
-              </div>
-            ))}
+          {/* Technical Details with Gauge Bars */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+            {(() => {
+              const jaz = result.jaz ?? 0;
+              const jazWW = result.jazWarmwasser ?? 0;
+              const vorlauf = result.vorlauftemperatur ?? 0;
+              const spezBedarf = result.specificHeatDemand ?? 0;
+
+              const metrics = [
+                {
+                  icon: Zap,
+                  label: "JAZ Heizung",
+                  value: jaz.toFixed(2),
+                  unit: "",
+                  // Reference: 2.5 = schlecht, 3.5 = okay, 4.5+ = sehr gut
+                  percent: Math.min(100, Math.max(0, ((jaz - 2.0) / (5.0 - 2.0)) * 100)),
+                  color: jaz >= 4.0 ? "bg-success" : jaz >= 3.0 ? "bg-warning" : "bg-destructive",
+                  rating: jaz >= 4.0 ? "Sehr gut" : jaz >= 3.5 ? "Gut" : jaz >= 3.0 ? "Befriedigend" : "Verbesserungsbedürftig",
+                  reference: "Zielwert ≥ 3,5 · Optimal ≥ 4,0",
+                },
+                {
+                  icon: Droplets,
+                  label: "JAZ Warmwasser",
+                  value: jazWW.toFixed(2),
+                  unit: "",
+                  percent: Math.min(100, Math.max(0, ((jazWW - 1.5) / (3.5 - 1.5)) * 100)),
+                  color: jazWW >= 3.0 ? "bg-success" : jazWW >= 2.5 ? "bg-warning" : "bg-destructive",
+                  rating: jazWW >= 3.0 ? "Sehr gut" : jazWW >= 2.5 ? "Gut" : jazWW >= 2.0 ? "Befriedigend" : "Niedrig",
+                  reference: "Zielwert ≥ 2,5 · Optimal ≥ 3,0",
+                },
+                {
+                  icon: Thermometer,
+                  label: "Vorlauftemperatur",
+                  value: `${vorlauf}`,
+                  unit: "°C",
+                  // Lower is better: 30°C = 100%, 60°C = 0%
+                  percent: Math.min(100, Math.max(0, ((60 - vorlauf) / (60 - 30)) * 100)),
+                  color: vorlauf <= 35 ? "bg-success" : vorlauf <= 45 ? "bg-warning" : "bg-destructive",
+                  rating: vorlauf <= 35 ? "Optimal" : vorlauf <= 42 ? "Gut" : vorlauf <= 50 ? "Erhöht" : "Zu hoch",
+                  reference: "Fußboden ≤ 35°C · WP-HK ≤ 42°C · Bestand ≤ 55°C",
+                },
+                {
+                  icon: Home,
+                  label: "Heizwärmebedarf",
+                  value: `${spezBedarf}`,
+                  unit: "kWh/m²",
+                  // Lower is better: 30 = 100%, 160 = 0%
+                  percent: Math.min(100, Math.max(0, ((160 - spezBedarf) / (160 - 30)) * 100)),
+                  color: spezBedarf <= 50 ? "bg-success" : spezBedarf <= 100 ? "bg-warning" : "bg-destructive",
+                  rating: spezBedarf <= 50 ? "Effizient (Neubau)" : spezBedarf <= 80 ? "Gut saniert" : spezBedarf <= 120 ? "Teilsaniert" : "Unsaniert",
+                  reference: "Neubau ≤ 50 · Saniert ≤ 80 · Altbau 100-150",
+                },
+              ];
+
+              return metrics.map((m) => (
+                <div key={m.label} className="bg-card rounded-xl border border-border p-5 shadow-card">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                      <m.icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{m.label}</p>
+                      <p className="text-xl font-bold font-mono text-foreground leading-tight">
+                        {m.value}<span className="text-sm text-muted-foreground ml-0.5">{m.unit}</span>
+                      </p>
+                    </div>
+                    <span className={`ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      m.color === "bg-success" ? "bg-success/10 text-success" :
+                      m.color === "bg-warning" ? "bg-warning/10 text-warning" :
+                      "bg-destructive/10 text-destructive"
+                    }`}>
+                      {m.rating}
+                    </span>
+                  </div>
+                  {/* Gauge bar */}
+                  <div className="h-2 bg-muted rounded-full overflow-hidden mb-2">
+                    <motion.div
+                      className={`h-full rounded-full ${m.color}`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${m.percent}%` }}
+                      transition={{ duration: 0.8, delay: 0.3 }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">{m.reference}</p>
+                </div>
+              ));
+            })()}
           </div>
 
           {/* Energy Breakdown */}
