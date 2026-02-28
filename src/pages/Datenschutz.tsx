@@ -1,9 +1,6 @@
-import Header from "@/components/Header";
-
 const Datenschutz = () => {
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <div className="container mx-auto max-w-3xl py-16 px-4">
         <h1 className="text-3xl font-bold text-foreground mb-2">Datenschutzerklärung</h1>
         <p className="text-muted-foreground mb-8">

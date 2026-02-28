@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { blogArticles, blogCategories } from "@/data/blogArticles";
 import { useState } from "react";
 import { Calendar, Clock, ArrowRight } from "lucide-react";
-import Header from "@/components/Header";
 
 const Blog = () => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -13,7 +12,6 @@ const Blog = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <div className="container mx-auto py-16 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">

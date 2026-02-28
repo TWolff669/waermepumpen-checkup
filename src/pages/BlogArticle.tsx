@@ -8,7 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import Header from "@/components/Header";
+
 
 const BlogArticle = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -17,7 +17,6 @@ const BlogArticle = () => {
   if (!article) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
         <div className="container mx-auto py-16 px-4 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">Artikel nicht gefunden</h1>
           <Button variant="outline" asChild>
@@ -49,7 +48,6 @@ const BlogArticle = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <article className="container mx-auto py-16 px-4">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
         {faqSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />}
