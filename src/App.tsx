@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import EfficiencyCheck from "./pages/EfficiencyCheck";
+import AdvancedCheck from "./pages/AdvancedCheck";
 import Results from "./pages/Results";
 import NotFound from "./pages/NotFound";
 
@@ -19,6 +20,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/efficiency-check" element={<EfficiencyCheck />} />
+          <Route path="/advanced-check" element={<AdvancedCheck />} />
           <Route path="/results" element={<Results />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

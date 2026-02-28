@@ -1,14 +1,15 @@
 import { motion } from "framer-motion";
-import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download } from "lucide-react";
+import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 interface ResultData {
-  score: number; // 0-100
-  deviation: number; // percentage
+  score: number;
+  deviation: number;
   simulatedConsumption: number;
   actualConsumption: number;
+  isAdvanced: boolean;
   recommendations: { category: string; title: string; impact: string }[];
 }
 
@@ -16,45 +17,71 @@ const generateMockResults = (data: Record<string, unknown>): ResultData => {
   const flaeche = Number(data.beheizteFlaeche) || 150;
   const personen = Number(data.personenAnzahl) || 3;
   const actualVerbrauch = Number(data.gesamtverbrauch) || 0;
+  const isAdvanced = Boolean(data.isAdvanced);
 
-  // Simple mock simulation
-  const baseConsumption = flaeche * 28; // ~28 kWh/m² for a decent WP
+  let baseConsumption = flaeche * 28;
   const personFactor = 1 + (personen - 2) * 0.05;
-  const simulatedConsumption = Math.round(baseConsumption * personFactor);
+  baseConsumption = baseConsumption * personFactor;
 
+  // Advanced adjustments
+  if (isAdvanced) {
+    const vorlauf = Number(data.vorlauftemperatur) || 42;
+    if (vorlauf > 45) baseConsumption *= 1.12;
+    else if (vorlauf <= 35) baseConsumption *= 0.92;
+
+    const duschen = Number(data.duschenProTag) || 2;
+    baseConsumption += duschen * 350;
+
+    const raumtemp = Number(data.raumtemperatur) || 21;
+    baseConsumption *= 1 + (raumtemp - 21) * 0.06;
+
+    if (data.automatischeRaumregler === "ja") baseConsumption *= 0.95;
+    if (data.wpHeizkoerper === "ja") baseConsumption *= 0.93;
+  }
+
+  const simulatedConsumption = Math.round(baseConsumption);
   const actual = actualVerbrauch || simulatedConsumption * (1 + (Math.random() * 0.4 - 0.1));
   const deviation = actual > 0 ? Math.round(((actual - simulatedConsumption) / simulatedConsumption) * 100) : 0;
   const score = Math.max(0, Math.min(100, 100 - Math.abs(deviation) * 2));
 
-  const recommendations = [
-    { category: "Einstellungen", title: "Vorlauftemperatur senken", impact: "Bis zu 10% Einsparung" },
-    { category: "Wartung", title: "Regelmäßige Filterkontrolle", impact: "3-5% Effizienzgewinn" },
-    { category: "Verhalten", title: "Nachtabsenkung optimieren", impact: "5-8% Einsparung" },
-  ];
+  const recommendations: { category: string; title: string; impact: string }[] = [];
+
+  if (isAdvanced) {
+    const vorlauf = Number(data.vorlauftemperatur) || 42;
+    if (vorlauf > 45) {
+      recommendations.push({ category: "Einstellungen", title: "Vorlauftemperatur auf max. 42°C senken", impact: "Bis zu 12% Einsparung möglich" });
+    }
+    if (data.automatischeRaumregler === "nein") {
+      recommendations.push({ category: "Investition", title: "Smarte Thermostate nachrüsten", impact: "5% Effizienzgewinn durch raumweise Regelung" });
+    }
+    const raumtemp = Number(data.raumtemperatur) || 21;
+    if (raumtemp > 21) {
+      recommendations.push({ category: "Verhalten", title: `Raumtemperatur von ${raumtemp}°C auf 21°C senken`, impact: `Ca. ${Math.round((raumtemp - 21) * 6)}% Einsparung` });
+    }
+    const duschen = Number(data.duschenProTag) || 2;
+    if (duschen > 3) {
+      recommendations.push({ category: "Warmwasser", title: "Warmwasserbedarf optimieren", impact: "Hoher WW-Verbrauch erhöht Stromkosten deutlich" });
+    }
+    if (data.wpHeizkoerper === "nein") {
+      recommendations.push({ category: "Investition", title: "Wärmepumpenheizkörper in Betracht ziehen", impact: "Bis zu 7% Effizienzsteigerung" });
+    }
+  } else {
+    recommendations.push(
+      { category: "Einstellungen", title: "Vorlauftemperatur senken", impact: "Bis zu 10% Einsparung" },
+      { category: "Wartung", title: "Regelmäßige Filterkontrolle", impact: "3-5% Effizienzgewinn" },
+      { category: "Verhalten", title: "Nachtabsenkung optimieren", impact: "5-8% Einsparung" },
+    );
+  }
 
   if (data.hydraulischerAbgleich === "nein") {
-    recommendations.unshift({
-      category: "Empfehlung",
-      title: "Hydraulischen Abgleich durchführen lassen",
-      impact: "Bis zu 15% Effizienzsteigerung",
-    });
+    recommendations.unshift({ category: "Empfehlung", title: "Hydraulischen Abgleich durchführen lassen", impact: "Bis zu 15% Effizienzsteigerung" });
   }
 
   if (Math.abs(deviation) > 25) {
-    recommendations.push({
-      category: "Fachplaner",
-      title: "Fachplaner hinzuziehen",
-      impact: "Professionelle Analyse empfohlen",
-    });
+    recommendations.push({ category: "Fachplaner", title: "Fachplaner hinzuziehen", impact: "Professionelle Analyse empfohlen" });
   }
 
-  return {
-    score,
-    deviation,
-    simulatedConsumption,
-    actualConsumption: Math.round(actual),
-    recommendations,
-  };
+  return { score, deviation, simulatedConsumption, actualConsumption: Math.round(actual), isAdvanced, recommendations };
 };
 
 const ResultsPage = () => {
@@ -63,12 +90,8 @@ const ResultsPage = () => {
 
   useEffect(() => {
     const stored = sessionStorage.getItem("wp-check-data");
-    if (!stored) {
-      navigate("/efficiency-check");
-      return;
-    }
-    const data = JSON.parse(stored);
-    setResult(generateMockResults(data));
+    if (!stored) { navigate("/efficiency-check"); return; }
+    setResult(generateMockResults(JSON.parse(stored)));
   }, [navigate]);
 
   if (!result) return null;
@@ -80,6 +103,15 @@ const ResultsPage = () => {
     <div className="min-h-screen gradient-subtle py-10">
       <div className="container max-w-2xl">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          {/* Badge */}
+          {result.isAdvanced && (
+            <div className="mb-4 text-center">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                <Settings2 className="h-3 w-3" /> Erweiterter Check
+              </span>
+            </div>
+          )}
+
           {/* Score Card */}
           <div className="bg-card rounded-xl shadow-elevated border border-border p-8 mb-8 text-center">
             <h1 className="text-2xl font-bold text-card-foreground mb-6">Ihr Effizienz-Ergebnis</h1>
@@ -89,9 +121,7 @@ const ResultsPage = () => {
                 <motion.circle
                   cx="80" cy="80" r="70" fill="none"
                   stroke={isGood ? "hsl(var(--success))" : isOk ? "hsl(var(--warning))" : "hsl(var(--destructive))"}
-                  strokeWidth="12"
-                  strokeLinecap="round"
-                  strokeDasharray={440}
+                  strokeWidth="12" strokeLinecap="round" strokeDasharray={440}
                   initial={{ strokeDashoffset: 440 }}
                   animate={{ strokeDashoffset: 440 - (440 * result.score) / 100 }}
                   transition={{ duration: 1, delay: 0.3 }}
@@ -167,6 +197,11 @@ const ResultsPage = () => {
             <Button variant="outline" asChild>
               <Link to="/efficiency-check"><RotateCcw className="mr-1 h-4 w-4" /> Neuen Check starten</Link>
             </Button>
+            {!result.isAdvanced && Math.abs(result.deviation) > 10 && (
+              <Button variant="default" asChild>
+                <Link to="/advanced-check"><Settings2 className="mr-1 h-4 w-4" /> Check verfeinern</Link>
+              </Button>
+            )}
             <Button variant="hero" onClick={() => window.print()}>
               <Download className="mr-1 h-4 w-4" /> Ergebnis speichern
             </Button>
