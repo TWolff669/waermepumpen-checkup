@@ -43,6 +43,10 @@ const verbrauchSchema = z.object({
   gesamtproduktion: z.string().optional(),
   abrechnungVon: z.string().optional(),
   abrechnungBis: z.string().optional(),
+  strompreis: z.string().refine(
+    (v) => v === "" || (!isNaN(Number(v)) && Number(v) >= 10 && Number(v) <= 60),
+    "Wert zwischen 10 und 60 ct/kWh"
+  ).optional().default(""),
 }).refine(
   (data) => data.abrechnungVorhanden !== "ja" || (Number(data.gesamtverbrauch) > 0),
   { message: "Bitte geben Sie den Stromverbrauch ein", path: ["gesamtverbrauch"] }
@@ -76,6 +80,7 @@ export const efficiencyFormSchema = z.object({
   gesamtproduktion: z.string().optional(),
   abrechnungVon: z.string().optional(),
   abrechnungBis: z.string().optional(),
+  strompreis: z.string().optional().default(""),
 });
 
 export type EfficiencyFormData = z.infer<typeof efficiencyFormSchema>;
@@ -106,6 +111,33 @@ export const advancedStepSchemas = [
     ).optional().default(""),
     automatischeRaumregler: z.enum(["ja", "nein"], { required_error: "Bitte wählen" }),
   }),
+  // Step 3: Heizstab
+  z.object({
+    heizstabVorhanden: z.enum(["ja", "nein", "unbekannt"], { required_error: "Bitte wählen" }),
+    heizstabLeistung: z.string().refine(
+      (v) => v === "" || (!isNaN(Number(v)) && Number(v) >= 1 && Number(v) <= 18),
+      "Wert zwischen 1 und 18 kW"
+    ).optional().default(""),
+    heizstabBetriebsstunden: z.string().refine(
+      (v) => v === "" || (!isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= 8760),
+      "Wert zwischen 0 und 8760 Stunden"
+    ).optional().default(""),
+    heizstabModus: z.enum(["notfall", "parallel", "unbekannt"]).optional().default("unbekannt"),
+  }),
+  // Step 4: PV-Anlage
+  z.object({
+    pvVorhanden: z.enum(["ja", "nein", "geplant"], { required_error: "Bitte wählen" }),
+    pvLeistung: z.string().refine(
+      (v) => v === "" || (!isNaN(Number(v)) && Number(v) >= 1 && Number(v) <= 50),
+      "Wert zwischen 1 und 50 kWp"
+    ).optional().default(""),
+    pvAusrichtung: z.string().optional().default(""),
+    batterieSpeicher: z.enum(["ja", "nein"]).optional().default("nein"),
+    batterieSpeicherKapazitaet: z.string().refine(
+      (v) => v === "" || (!isNaN(Number(v)) && Number(v) >= 1 && Number(v) <= 30),
+      "Wert zwischen 1 und 30 kWh"
+    ).optional().default(""),
+  }),
 ] as const;
 
 export const advancedFormSchema = z.object({
@@ -114,6 +146,15 @@ export const advancedFormSchema = z.object({
   duschenProTag: z.string().optional().default(""),
   raumtemperatur: z.string().optional().default(""),
   automatischeRaumregler: z.enum(["ja", "nein"]).default("nein"),
+  heizstabVorhanden: z.enum(["ja", "nein", "unbekannt"]).default("unbekannt"),
+  heizstabLeistung: z.string().optional().default(""),
+  heizstabBetriebsstunden: z.string().optional().default(""),
+  heizstabModus: z.enum(["notfall", "parallel", "unbekannt"]).optional().default("unbekannt"),
+  pvVorhanden: z.enum(["ja", "nein", "geplant"]).default("nein"),
+  pvLeistung: z.string().optional().default(""),
+  pvAusrichtung: z.string().optional().default(""),
+  batterieSpeicher: z.enum(["ja", "nein"]).default("nein"),
+  batterieSpeicherKapazitaet: z.string().optional().default(""),
 });
 
 export type AdvancedFormData = z.infer<typeof advancedFormSchema>;

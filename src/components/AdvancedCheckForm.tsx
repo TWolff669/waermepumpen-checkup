@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
 import InfoTooltip from "@/components/InfoTooltip";
 import { advancedStepSchemas } from "@/lib/validations";
@@ -15,14 +16,25 @@ interface AdvancedFormData {
   duschenProTag: string;
   raumtemperatur: string;
   automatischeRaumregler: string;
+  heizstabVorhanden: string;
+  heizstabLeistung: string;
+  heizstabBetriebsstunden: string;
+  heizstabModus: string;
+  pvVorhanden: string;
+  pvLeistung: string;
+  pvAusrichtung: string;
+  batterieSpeicher: string;
+  batterieSpeicherKapazitaet: string;
 }
 
 const initialData: AdvancedFormData = {
   vorlauftemperatur: "", wpHeizkoerper: "", duschenProTag: "",
   raumtemperatur: "", automatischeRaumregler: "",
+  heizstabVorhanden: "", heizstabLeistung: "", heizstabBetriebsstunden: "", heizstabModus: "",
+  pvVorhanden: "", pvLeistung: "", pvAusrichtung: "", batterieSpeicher: "", batterieSpeicherKapazitaet: "",
 };
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 5;
 
 const FieldError = ({ message }: { message?: string }) => {
   if (!message) return null;
@@ -46,6 +58,8 @@ const AdvancedCheckForm = () => {
     ["vorlauftemperatur", "wpHeizkoerper"],
     ["duschenProTag"],
     ["raumtemperatur", "automatischeRaumregler"],
+    ["heizstabVorhanden", "heizstabLeistung", "heizstabBetriebsstunden", "heizstabModus"],
+    ["pvVorhanden", "pvLeistung", "pvAusrichtung", "batterieSpeicher", "batterieSpeicherKapazitaet"],
   ];
 
   const validateStep = (stepIndex: number): boolean => {
@@ -77,7 +91,7 @@ const AdvancedCheckForm = () => {
     navigate("/results");
   };
 
-  const stepLabels = ["Heizkreis", "Warmwasser", "Raumklima"];
+  const stepLabels = ["Heizkreis", "Warmwasser", "Raumklima", "Heizstab", "PV-Anlage"];
 
   return (
     <div className="min-h-screen gradient-subtle">
@@ -91,11 +105,11 @@ const AdvancedCheckForm = () => {
         <div className="mb-10">
           <div className="flex items-center justify-between mb-3">
             {stepLabels.map((label, i) => (
-              <div key={label} className="flex items-center gap-2">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+              <div key={label} className="flex items-center gap-1.5">
+                <div className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-semibold transition-colors ${
                   i < step ? "bg-primary text-primary-foreground" : i === step ? "gradient-hero text-primary-foreground" : "bg-muted text-muted-foreground"
                 }`}>{i + 1}</div>
-                <span className={`hidden sm:block text-sm font-medium ${i === step ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                <span className={`hidden md:block text-xs font-medium ${i === step ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
               </div>
             ))}
           </div>
@@ -179,6 +193,120 @@ const AdvancedCheckForm = () => {
                       </RadioGroup>
                       <FieldError message={errors.automatischeRaumregler} />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-card-foreground"><InfoTooltip term="Heizstab">Heizstab</InfoTooltip></h2>
+                  <div className="grid gap-5">
+                    <div>
+                      <Label>Heizstab vorhanden?</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">Der Heizstab ist ein elektrischer Zuheizer in der Wärmepumpe</p>
+                      <RadioGroup value={data.heizstabVorhanden} onValueChange={(v) => update("heizstabVorhanden", v)} className="mt-2 flex gap-4">
+                        <div className="flex items-center gap-2"><RadioGroupItem value="ja" id="hs-ja" /><Label htmlFor="hs-ja" className="font-normal">Ja</Label></div>
+                        <div className="flex items-center gap-2"><RadioGroupItem value="nein" id="hs-nein" /><Label htmlFor="hs-nein" className="font-normal">Nein</Label></div>
+                        <div className="flex items-center gap-2"><RadioGroupItem value="unbekannt" id="hs-unbekannt" /><Label htmlFor="hs-unbekannt" className="font-normal">Unbekannt</Label></div>
+                      </RadioGroup>
+                      <FieldError message={errors.heizstabVorhanden} />
+                    </div>
+
+                    {data.heizstabVorhanden === "ja" && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-5">
+                        <div>
+                          <Label htmlFor="hsLeistung">Heizstab-Leistung (kW)</Label>
+                          <div className="flex gap-2 mt-1.5">
+                            {["3", "6", "9"].map((v) => (
+                              <Button key={v} type="button" variant={data.heizstabLeistung === v ? "default" : "outline"} size="sm" onClick={() => update("heizstabLeistung", v)}>{v} kW</Button>
+                            ))}
+                            <Input id="hsLeistung" type="number" placeholder="Andere" value={!["3", "6", "9"].includes(data.heizstabLeistung) ? data.heizstabLeistung : ""} onChange={(e) => update("heizstabLeistung", e.target.value)} className="w-24" />
+                          </div>
+                          <FieldError message={errors.heizstabLeistung} />
+                        </div>
+                        <div>
+                          <Label htmlFor="hsBetrieb">Betriebsstunden Heizstab (Stunden/Jahr)</Label>
+                          <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">Ablesbar im WP-Menü unter „Betriebsstunden Heizstab" oder „Zuheizer". Falls unbekannt, leer lassen.</p>
+                          <Input id="hsBetrieb" type="number" placeholder="z.B. 200" value={data.heizstabBetriebsstunden} onChange={(e) => update("heizstabBetriebsstunden", e.target.value)} className="w-32" />
+                          <FieldError message={errors.heizstabBetriebsstunden} />
+                        </div>
+                        <div>
+                          <Label><InfoTooltip term="Bivalenzpunkt">Heizstab-Betriebsmodus</InfoTooltip></Label>
+                          <RadioGroup value={data.heizstabModus} onValueChange={(v) => update("heizstabModus", v)} className="mt-2 space-y-2">
+                            <div className="flex items-center gap-2"><RadioGroupItem value="notfall" id="hsm-notfall" /><Label htmlFor="hsm-notfall" className="font-normal">Nur Notfall (Bivalent-alternativ)</Label></div>
+                            <div className="flex items-center gap-2"><RadioGroupItem value="parallel" id="hsm-parallel" /><Label htmlFor="hsm-parallel" className="font-normal">Regelmäßig im Winter (Bivalent-parallel)</Label></div>
+                            <div className="flex items-center gap-2"><RadioGroupItem value="unbekannt" id="hsm-unbekannt" /><Label htmlFor="hsm-unbekannt" className="font-normal">Unbekannt</Label></div>
+                          </RadioGroup>
+                          <FieldError message={errors.heizstabModus} />
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-card-foreground"><InfoTooltip term="PV-Eigenverbrauch">PV-Anlage</InfoTooltip></h2>
+                  <div className="grid gap-5">
+                    <div>
+                      <Label>PV-Anlage vorhanden?</Label>
+                      <RadioGroup value={data.pvVorhanden} onValueChange={(v) => update("pvVorhanden", v)} className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2"><RadioGroupItem value="ja" id="pv-ja" /><Label htmlFor="pv-ja" className="font-normal">Ja, PV-Anlage vorhanden</Label></div>
+                        <div className="flex items-center gap-2"><RadioGroupItem value="nein" id="pv-nein" /><Label htmlFor="pv-nein" className="font-normal">Nein</Label></div>
+                        <div className="flex items-center gap-2"><RadioGroupItem value="geplant" id="pv-geplant" /><Label htmlFor="pv-geplant" className="font-normal">Geplant</Label></div>
+                      </RadioGroup>
+                      <FieldError message={errors.pvVorhanden} />
+                    </div>
+
+                    {(data.pvVorhanden === "ja" || data.pvVorhanden === "geplant") && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-5">
+                        <div>
+                          <Label htmlFor="pvLeistung">PV-Leistung (kWp)</Label>
+                          <div className="flex gap-2 mt-1.5">
+                            {["5", "10", "15", "20"].map((v) => (
+                              <Button key={v} type="button" variant={data.pvLeistung === v ? "default" : "outline"} size="sm" onClick={() => update("pvLeistung", v)}>{v} kWp</Button>
+                            ))}
+                            <Input id="pvLeistung" type="number" placeholder="Andere" value={!["5", "10", "15", "20"].includes(data.pvLeistung) ? data.pvLeistung : ""} onChange={(e) => update("pvLeistung", e.target.value)} className="w-24" />
+                          </div>
+                          <FieldError message={errors.pvLeistung} />
+                        </div>
+                        <div>
+                          <Label>Ausrichtung</Label>
+                          <Select value={data.pvAusrichtung} onValueChange={(v) => update("pvAusrichtung", v)}>
+                            <SelectTrigger className="mt-1.5"><SelectValue placeholder="Ausrichtung wählen" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sued">Süd</SelectItem>
+                              <SelectItem value="sued-west">Süd-West</SelectItem>
+                              <SelectItem value="sued-ost">Süd-Ost</SelectItem>
+                              <SelectItem value="west">West</SelectItem>
+                              <SelectItem value="ost">Ost</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FieldError message={errors.pvAusrichtung} />
+                        </div>
+                        <div>
+                          <Label>Batteriespeicher vorhanden?</Label>
+                          <RadioGroup value={data.batterieSpeicher} onValueChange={(v) => update("batterieSpeicher", v)} className="mt-2 flex gap-4">
+                            <div className="flex items-center gap-2"><RadioGroupItem value="ja" id="bat-ja" /><Label htmlFor="bat-ja" className="font-normal">Ja</Label></div>
+                            <div className="flex items-center gap-2"><RadioGroupItem value="nein" id="bat-nein" /><Label htmlFor="bat-nein" className="font-normal">Nein</Label></div>
+                          </RadioGroup>
+                          <FieldError message={errors.batterieSpeicher} />
+                        </div>
+                        {data.batterieSpeicher === "ja" && (
+                          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                            <Label htmlFor="batKap">Speicherkapazität (kWh)</Label>
+                            <div className="flex gap-2 mt-1.5">
+                              {["5", "10", "15"].map((v) => (
+                                <Button key={v} type="button" variant={data.batterieSpeicherKapazitaet === v ? "default" : "outline"} size="sm" onClick={() => update("batterieSpeicherKapazitaet", v)}>{v} kWh</Button>
+                              ))}
+                              <Input id="batKap" type="number" placeholder="Andere" value={!["5", "10", "15"].includes(data.batterieSpeicherKapazitaet) ? data.batterieSpeicherKapazitaet : ""} onChange={(e) => update("batterieSpeicherKapazitaet", e.target.value)} className="w-24" />
+                            </div>
+                            <FieldError message={errors.batterieSpeicherKapazitaet} />
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    )}
                   </div>
                 </div>
               )}
