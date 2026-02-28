@@ -9,13 +9,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, Crown } from "lucide-react";
+import { canCreateProject, canSaveProjects, getTierLabel, isTierExpired } from "@/lib/tier-guard";
 import type { SimulationInput, SimulationResult } from "@/lib/simulation";
+import type { SzenarioExportData } from "@/components/ScenarioSimulator";
 
 interface SaveProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   inputData: SimulationInput;
   resultData: SimulationResult;
+  scenarioData?: SzenarioExportData | null;
   preselectedProjectId?: string | null;
   preselectedProjectName?: string | null;
 }
@@ -32,7 +36,6 @@ function generateHeizperioden(): string[] {
 function guessHeizperiode(von?: string, bis?: string): string {
   if (von && bis) {
     const start = new Date(von);
-    const end = new Date(bis);
     const y = start.getMonth() >= 6 ? start.getFullYear() : start.getFullYear() - 1;
     return `${y}/${y + 1}`;
   }
@@ -41,10 +44,12 @@ function guessHeizperiode(von?: string, bis?: string): string {
   return `${y}/${y + 1}`;
 }
 
-const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselectedProjectId, preselectedProjectName }: SaveProjectDialogProps) => {
-  const { user } = useAuth();
+const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, scenarioData, preselectedProjectId, preselectedProjectName }: SaveProjectDialogProps) => {
+  const { user, tierProfile } = useAuth();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [tierCheck, setTierCheck] = useState<{ allowed: boolean; reason?: string; currentCount: number; maxCount: number } | null>(null);
+  const [tierLoading, setTierLoading] = useState(false);
 
   // New project tab
   const [name, setName] = useState("");
@@ -60,6 +65,17 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
   const [checkDate, setCheckDate] = useState(new Date().toISOString().slice(0, 10));
 
   const defaultTab = preselectedProjectId ? "existing" : "new";
+
+  // Check tier limits when dialog opens for new project creation
+  useEffect(() => {
+    if (open && user?.id && !preselectedProjectId) {
+      setTierLoading(true);
+      canCreateProject(user.id).then((result) => {
+        setTierCheck(result);
+        setTierLoading(false);
+      });
+    }
+  }, [open, user?.id, preselectedProjectId]);
 
   const { data: projects } = useQuery({
     queryKey: ["projects-for-save", user?.id],
@@ -78,6 +94,16 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
     if (preselectedProjectId) setSelectedProjectId(preselectedProjectId);
   }, [preselectedProjectId]);
 
+  const buildScenarioJson = () => {
+    if (!scenarioData) return null;
+    return {
+      szenario: scenarioData.szenario,
+      selectedMassnahmenIds: scenarioData.selectedMassnahmen.map(m => m.id),
+      foerderungenBund: scenarioData.foerderungenBund,
+      foerderungenRegional: scenarioData.foerderungenRegional,
+    };
+  };
+
   const insertCheck = async (projectId: string) => {
     const { error } = await supabase.from("checks").insert({
       project_id: projectId,
@@ -92,14 +118,23 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
 
   const handleSaveNew = async () => {
     if (!user || !name.trim()) return;
+
+    // Re-check tier
+    if (tierCheck && !tierCheck.allowed) {
+      toast({ title: "Limit erreicht", description: tierCheck.reason, variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
+      const scenarioJson = buildScenarioJson();
       const { data: proj, error: projErr } = await supabase.from("projects").insert({
         user_id: user.id,
         name: name.trim(),
         address: address.trim() || null,
         input_data: inputData as any,
         result_data: resultData as any,
+        scenario_data: scenarioJson as any,
         is_advanced: resultData.isAdvanced,
       }).select("id").single();
       if (projErr) throw projErr;
@@ -121,12 +156,14 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
     if (!selectedProjectId) return;
     setSaving(true);
     try {
+      const scenarioJson = buildScenarioJson();
       await insertCheck(selectedProjectId);
 
-      // Also update project's latest result_data
+      // Also update project's latest result_data + scenario_data
       await supabase.from("projects").update({
         result_data: resultData as any,
         input_data: inputData as any,
+        scenario_data: scenarioJson as any,
         is_advanced: resultData.isAdvanced,
       }).eq("id", selectedProjectId);
 
@@ -139,6 +176,32 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
     }
   };
 
+  const isExpired = tierProfile ? isTierExpired(tierProfile.tierExpiresAt) : false;
+  const canSave = tierProfile ? canSaveProjects(tierProfile.tier) : false;
+
+  // Show tier limit warning
+  const renderTierWarning = () => {
+    if (tierLoading || !tierCheck) return null;
+    if (tierCheck.allowed) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          Projekte: {tierCheck.currentCount}/{tierCheck.maxCount} belegt
+        </p>
+      );
+    }
+    return (
+      <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+        <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-foreground">{tierCheck.reason}</p>
+          <Button variant="link" size="sm" className="p-0 h-auto text-primary" asChild>
+            <a href="/pricing"><Crown className="h-3 w-3 mr-1" /> Jetzt upgraden</a>
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -147,6 +210,16 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
             {preselectedProjectId ? `Check zu "${preselectedProjectName}" hinzufügen` : "Ergebnis speichern"}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Tier expired warning */}
+        {isExpired && (
+          <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-foreground">
+              Ihr {getTierLabel(tierProfile!.tier)}-Plan ist abgelaufen. Projekte sind aktuell nur lesbar.
+            </p>
+          </div>
+        )}
 
         {preselectedProjectId ? (
           <div className="space-y-4 py-2">
@@ -165,7 +238,7 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
-              <Button variant="hero" onClick={handleAddToExisting} disabled={saving}>
+              <Button variant="hero" onClick={handleAddToExisting} disabled={saving || isExpired}>
                 {saving ? "Speichern..." : "Check hinzufügen"}
               </Button>
             </DialogFooter>
@@ -202,13 +275,14 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
-                <Button variant="hero" onClick={handleAddToExisting} disabled={!selectedProjectId || saving}>
+                <Button variant="hero" onClick={handleAddToExisting} disabled={!selectedProjectId || saving || isExpired}>
                   {saving ? "Speichern..." : "Check hinzufügen"}
                 </Button>
               </DialogFooter>
             </TabsContent>
 
             <TabsContent value="new" className="space-y-4 pt-2">
+              {renderTierWarning()}
               <div>
                 <Label>Projektname *</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="z.B. Mein Haus" className="mt-1.5" />
@@ -232,7 +306,7 @@ const SaveProjectDialog = ({ open, onOpenChange, inputData, resultData, preselec
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
-                <Button variant="hero" onClick={handleSaveNew} disabled={!name.trim() || saving}>
+                <Button variant="hero" onClick={handleSaveNew} disabled={!name.trim() || saving || (tierCheck !== null && !tierCheck.allowed) || isExpired}>
                   {saving ? "Speichern..." : "Projekt anlegen & Check speichern"}
                 </Button>
               </DialogFooter>
