@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks } from "lucide-react";
+import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks, Save, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -8,14 +8,28 @@ import { runSimulation, type SimulationResult, type SimulationInput } from "@/li
 import { exportResultsPDF } from "@/lib/pdf-export";
 import InfoTooltip from "@/components/InfoTooltip";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { useAuth } from "@/hooks/useAuth";
+import SaveProjectDialog from "@/components/SaveProjectDialog";
 
 const ResultsPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [inputData, setInputData] = useState<SimulationInput | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   useEffect(() => {
+    // Check if we have pre-loaded result from a saved project
+    const storedResult = sessionStorage.getItem("wp-check-result");
     const stored = sessionStorage.getItem("wp-check-data");
+
+    if (storedResult && stored) {
+      setInputData(JSON.parse(stored) as SimulationInput);
+      setResult(JSON.parse(storedResult) as SimulationResult);
+      sessionStorage.removeItem("wp-check-result");
+      return;
+    }
+
     if (!stored) { navigate("/efficiency-check"); return; }
     const data = JSON.parse(stored) as SimulationInput;
     setInputData(data);
@@ -24,8 +38,9 @@ const ResultsPage = () => {
 
   if (!result) return null;
 
-  const isGood = result.score >= 70;
-  const isOk = result.score >= 40 && result.score < 70;
+  const hasComparison = result.score !== -1;
+  const isGood = hasComparison && result.score >= 70;
+  const isOk = hasComparison && result.score >= 40 && result.score < 70;
 
   return (
     <div className="min-h-screen gradient-subtle py-10">
@@ -40,35 +55,53 @@ const ResultsPage = () => {
             </div>
           )}
 
-          {/* Score Card */}
-          <div className="bg-card rounded-xl shadow-elevated border border-border p-8 mb-8 text-center">
-            <h1 className="text-2xl font-bold text-card-foreground mb-6">Ihr Effizienz-Ergebnis</h1>
-            <div className="relative inline-flex items-center justify-center mb-6">
-              <svg className="w-40 h-40" viewBox="0 0 160 160">
-                <circle cx="80" cy="80" r="70" fill="none" stroke="hsl(var(--muted))" strokeWidth="12" />
-                <motion.circle
-                  cx="80" cy="80" r="70" fill="none"
-                  stroke={isGood ? "hsl(var(--success))" : isOk ? "hsl(var(--warning))" : "hsl(var(--destructive))"}
-                  strokeWidth="12" strokeLinecap="round" strokeDasharray={440}
-                  initial={{ strokeDashoffset: 440 }}
-                  animate={{ strokeDashoffset: 440 - (440 * result.score) / 100 }}
-                  transition={{ duration: 1, delay: 0.3 }}
-                  transform="rotate(-90 80 80)"
-                />
-              </svg>
-              <div className="absolute">
-                <span className="text-4xl font-bold font-mono text-foreground">{result.score}</span>
-                <span className="text-lg text-muted-foreground">/100</span>
+          {/* Score Card or No-Comparison Info */}
+          {hasComparison ? (
+            <div className="bg-card rounded-xl shadow-elevated border border-border p-8 mb-8 text-center">
+              <h1 className="text-2xl font-bold text-card-foreground mb-6">Ihr Effizienz-Ergebnis</h1>
+              <div className="relative inline-flex items-center justify-center mb-6">
+                <svg className="w-40 h-40" viewBox="0 0 160 160">
+                  <circle cx="80" cy="80" r="70" fill="none" stroke="hsl(var(--muted))" strokeWidth="12" />
+                  <motion.circle
+                    cx="80" cy="80" r="70" fill="none"
+                    stroke={isGood ? "hsl(var(--success))" : isOk ? "hsl(var(--warning))" : "hsl(var(--destructive))"}
+                    strokeWidth="12" strokeLinecap="round" strokeDasharray={440}
+                    initial={{ strokeDashoffset: 440 }}
+                    animate={{ strokeDashoffset: 440 - (440 * result.score) / 100 }}
+                    transition={{ duration: 1, delay: 0.3 }}
+                    transform="rotate(-90 80 80)"
+                  />
+                </svg>
+                <div className="absolute">
+                  <span className="text-4xl font-bold font-mono text-foreground">{result.score}</span>
+                  <span className="text-lg text-muted-foreground">/100</span>
+                </div>
               </div>
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+                isGood ? "bg-success/10 text-success" : isOk ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"
+              }`}>
+                {isGood ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                {isGood ? "Gute Effizienz" : isOk ? "Verbesserungspotenzial" : "Deutliches Verbesserungspotenzial"}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">Klimaregion: {result.climateRegion}</p>
             </div>
-            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-              isGood ? "bg-success/10 text-success" : isOk ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"
-            }`}>
-              {isGood ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-              {isGood ? "Gute Effizienz" : isOk ? "Verbesserungspotenzial" : "Deutliches Verbesserungspotenzial"}
+          ) : (
+            <div className="bg-info/10 border border-info/20 rounded-xl p-6 mb-8">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground mb-2">Kein Verbrauchsvergleich möglich</h2>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Geben Sie Ihre tatsächlichen Verbrauchsdaten ein, um Ihre WP-Effizienz bewerten zu können.
+                  </p>
+                  <Button variant="default" size="sm" onClick={() => navigate("/efficiency-check")}>
+                    Verbrauchsdaten nachtragen <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">Klimaregion: {result.climateRegion}</p>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">Klimaregion: {result.climateRegion}</p>
-          </div>
+          )}
 
           {/* Technical Details with Gauge Bars */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
@@ -80,43 +113,28 @@ const ResultsPage = () => {
 
               const metrics = [
                 {
-                  icon: Zap,
-                  label: "JAZ Heizung",
-                  value: jaz.toFixed(2),
-                  unit: "",
-                  // Reference: 2.5 = schlecht, 3.5 = okay, 4.5+ = sehr gut
+                  icon: Zap, label: "JAZ Heizung", value: jaz.toFixed(2), unit: "",
                   percent: Math.min(100, Math.max(0, ((jaz - 2.0) / (5.0 - 2.0)) * 100)),
                   color: jaz >= 4.0 ? "bg-success" : jaz >= 3.0 ? "bg-warning" : "bg-destructive",
                   rating: jaz >= 4.0 ? "Sehr gut" : jaz >= 3.5 ? "Gut" : jaz >= 3.0 ? "Befriedigend" : "Verbesserungsbedürftig",
                   reference: "Zielwert ≥ 3,5 · Optimal ≥ 4,0",
                 },
                 {
-                  icon: Droplets,
-                  label: "JAZ Warmwasser",
-                  value: jazWW.toFixed(2),
-                  unit: "",
+                  icon: Droplets, label: "JAZ Warmwasser", value: jazWW.toFixed(2), unit: "",
                   percent: Math.min(100, Math.max(0, ((jazWW - 1.5) / (3.5 - 1.5)) * 100)),
                   color: jazWW >= 3.0 ? "bg-success" : jazWW >= 2.5 ? "bg-warning" : "bg-destructive",
                   rating: jazWW >= 3.0 ? "Sehr gut" : jazWW >= 2.5 ? "Gut" : jazWW >= 2.0 ? "Befriedigend" : "Niedrig",
                   reference: "Zielwert ≥ 2,5 · Optimal ≥ 3,0",
                 },
                 {
-                  icon: Thermometer,
-                  label: "Vorlauftemperatur",
-                  value: `${vorlauf}`,
-                  unit: "°C",
-                  // Lower is better: 30°C = 100%, 60°C = 0%
+                  icon: Thermometer, label: "Vorlauftemperatur", value: `${vorlauf}`, unit: "°C",
                   percent: Math.min(100, Math.max(0, ((60 - vorlauf) / (60 - 30)) * 100)),
                   color: vorlauf <= 35 ? "bg-success" : vorlauf <= 45 ? "bg-warning" : "bg-destructive",
                   rating: vorlauf <= 35 ? "Optimal" : vorlauf <= 42 ? "Gut" : vorlauf <= 50 ? "Erhöht" : "Zu hoch",
                   reference: "Fußboden ≤ 35°C · WP-HK ≤ 42°C · Bestand ≤ 55°C",
                 },
                 {
-                  icon: Home,
-                  label: "Heizwärmebedarf",
-                  value: `${spezBedarf}`,
-                  unit: "kWh/m²",
-                  // Lower is better: 30 = 100%, 160 = 0%
+                  icon: Home, label: "Heizwärmebedarf", value: `${spezBedarf}`, unit: "kWh/m²",
                   percent: Math.min(100, Math.max(0, ((160 - spezBedarf) / (160 - 30)) * 100)),
                   color: spezBedarf <= 50 ? "bg-success" : spezBedarf <= 100 ? "bg-warning" : "bg-destructive",
                   rating: spezBedarf <= 50 ? "Effizient (Neubau)" : spezBedarf <= 80 ? "Gut saniert" : spezBedarf <= 120 ? "Teilsaniert" : "Unsaniert",
@@ -144,7 +162,6 @@ const ResultsPage = () => {
                       {m.rating}
                     </span>
                   </div>
-                  {/* Gauge bar */}
                   <div className="h-2 bg-muted rounded-full overflow-hidden mb-2">
                     <motion.div
                       className={`h-full rounded-full ${m.color}`}
@@ -171,12 +188,7 @@ const ResultsPage = () => {
                       { name: "Heizung", value: result.heatingDemand },
                       { name: "Warmwasser", value: result.hotWaterDemand },
                     ]}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
+                    cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     <Cell fill="hsl(var(--primary))" />
@@ -221,41 +233,43 @@ const ResultsPage = () => {
             </div>
           </div>
 
-          {/* Consumption Comparison Bar Chart */}
-          <div className="bg-card rounded-xl shadow-card border border-border p-6 mb-8">
-            <h2 className="text-lg font-semibold text-card-foreground mb-4">Stromverbrauch WP</h2>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart
-                data={[
-                  { name: "Simuliert (Optimum)", value: result.simulatedConsumption },
-                  { name: "Tatsächlich", value: result.actualConsumption },
-                ]}
-                margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip
-                  formatter={(value: number) => [`${value.toLocaleString()} kWh`, "Verbrauch"]}
-                  contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={50}>
-                  <Cell fill="hsl(var(--primary))" />
-                  <Cell fill={result.deviation > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))"} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="mt-3 text-center space-y-1">
-              <span className={`text-sm font-medium ${result.deviation > 0 ? "text-destructive" : "text-success"}`}>
-                {result.deviation > 0 ? "+" : ""}{result.deviation}% Abweichung
-              </span>
-              {result.isPartialPeriod && (
-                <p className="text-[10px] text-muted-foreground">
-                  ⚠ Verbrauchsdaten aus {result.measurementDays} Tagen auf 12 Monate hochgerechnet (HGT-gewichtet)
-                </p>
-              )}
+          {/* Consumption Comparison Bar Chart - only if comparison available */}
+          {hasComparison && (
+            <div className="bg-card rounded-xl shadow-card border border-border p-6 mb-8">
+              <h2 className="text-lg font-semibold text-card-foreground mb-4">Stromverbrauch WP</h2>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart
+                  data={[
+                    { name: "Simuliert (Optimum)", value: result.simulatedConsumption },
+                    { name: "Tatsächlich", value: result.actualConsumption },
+                  ]}
+                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <Tooltip
+                    formatter={(value: number) => [`${value.toLocaleString()} kWh`, "Verbrauch"]}
+                    contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={50}>
+                    <Cell fill="hsl(var(--primary))" />
+                    <Cell fill={result.deviation > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))"} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-3 text-center space-y-1">
+                <span className={`text-sm font-medium ${result.deviation > 0 ? "text-destructive" : "text-success"}`}>
+                  {result.deviation > 0 ? "+" : ""}{result.deviation}% Abweichung
+                </span>
+                {result.isPartialPeriod && (
+                  <p className="text-[10px] text-muted-foreground">
+                    ⚠ Verbrauchsdaten aus {result.measurementDays} Tagen auf 12 Monate hochgerechnet (HGT-gewichtet)
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Recommendations */}
           <div className="bg-card rounded-xl shadow-card border border-border p-6 mb-8">
@@ -333,15 +347,30 @@ const ResultsPage = () => {
             <Button variant="outline" asChild>
               <Link to="/efficiency-check"><RotateCcw className="mr-1 h-4 w-4" /> Neuen Check starten</Link>
             </Button>
-            {!result.isAdvanced && Math.abs(result.deviation) > 10 && (
+            {!result.isAdvanced && hasComparison && Math.abs(result.deviation) > 10 && (
               <Button variant="default" asChild>
                 <Link to="/advanced-check"><Settings2 className="mr-1 h-4 w-4" /> Check verfeinern</Link>
+              </Button>
+            )}
+            {user && inputData && (
+              <Button variant="default" onClick={() => setSaveDialogOpen(true)}>
+                <Save className="mr-1 h-4 w-4" /> Projekt speichern
               </Button>
             )}
             <Button variant="hero" onClick={() => exportResultsPDF(result, inputData ?? undefined)}>
               <Download className="mr-1 h-4 w-4" /> Als PDF herunterladen
             </Button>
           </div>
+
+          {/* Save Project Dialog */}
+          {user && inputData && (
+            <SaveProjectDialog
+              open={saveDialogOpen}
+              onOpenChange={setSaveDialogOpen}
+              inputData={inputData}
+              resultData={result}
+            />
+          )}
         </motion.div>
       </div>
     </div>
