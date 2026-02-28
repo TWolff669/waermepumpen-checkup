@@ -47,6 +47,31 @@ export const MASSNAHMEN_EXCLUSIONS: Record<string, string[]> = {
 };
 
 /**
+ * Voraussetzungen: Maßnahme X ist nur wählbar, wenn Maßnahme Y ebenfalls gewählt ist.
+ * Key = abhängige Maßnahme, Value = Array von IDs, von denen mindestens eine gewählt sein muss.
+ */
+export const MASSNAHMEN_PREREQUISITES: Record<string, string[]> = {
+  // Batteriespeicher ist nur sinnvoll mit PV-Anlage
+  batteriespeicher: ["pv_anlage"],
+};
+
+/**
+ * Prüft, ob eine Maßnahme eine unerfüllte Voraussetzung hat.
+ * Gibt das Label der fehlenden Voraussetzung zurück, oder undefined.
+ */
+export function getMassnahmeRequires(
+  massnahmeId: string,
+  selectedIds: string[]
+): string | undefined {
+  const prereqs = MASSNAHMEN_PREREQUISITES[massnahmeId];
+  if (!prereqs) return undefined;
+  const hasPrereq = prereqs.some(id => selectedIds.includes(id));
+  if (hasPrereq) return undefined;
+  const required = DEFAULT_MASSNAHMEN_KOSTEN.find(m => m.id === prereqs[0]);
+  return required?.label;
+}
+
+/**
  * Prüft, ob eine Maßnahme aufgrund der aktuellen Auswahl gesperrt ist.
  * Gibt den Sperrgrund (Label der sperrenden Maßnahme) zurück, oder undefined.
  */

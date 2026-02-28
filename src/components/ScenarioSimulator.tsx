@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Calculator, TrendingUp, Clock, Euro, Award, ExternalLink, ChevronDown, Info } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { type Recommendation } from "@/lib/simulation";
-import { matchMassnahmeToRecommendation, berechneSzenario, getMassnahmeBlockedBy, type MassnahmeKosten, type SzenarioErgebnis } from "@/lib/massnahmen-kosten";
+import { matchMassnahmeToRecommendation, berechneSzenario, getMassnahmeBlockedBy, getMassnahmeRequires, type MassnahmeKosten, type SzenarioErgebnis } from "@/lib/massnahmen-kosten";
 import { getRegionaleFoerderung, getRelevanteFoerderung, type Foerdermittel } from "@/lib/foerderung";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
@@ -47,8 +47,23 @@ const ScenarioSimulator = ({
   const toggleSelection = (idx: number) => {
     setSelected(prev => {
       const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
+      if (next.has(idx)) {
+        next.delete(idx);
+        // Auto-deselect measures that depend on this one
+        const removedKosten = recWithCosts.find(r => r.index === idx)?.kosten;
+        if (removedKosten) {
+          for (const entry of recWithCosts) {
+            if (entry.kosten && next.has(entry.index)) {
+              const requires = getMassnahmeRequires(entry.kosten.id, 
+                Array.from(next).map(i => recWithCosts.find(r => r.index === i)?.kosten?.id).filter((id): id is string => !!id)
+              );
+              if (requires) next.delete(entry.index);
+            }
+          }
+        }
+      } else {
+        next.add(idx);
+      }
       return next;
     });
     setShowResults(false);
@@ -106,11 +121,13 @@ const ScenarioSimulator = ({
         {simulierbareMassnahmen.map(({ rec, index, kosten }) => {
           const blockedBy = kosten ? getMassnahmeBlockedBy(kosten.id, selectedIds.filter(id => id !== kosten.id)) : undefined;
           const isBlocked = !!blockedBy && !selected.has(index);
+          const requiresLabel = kosten && !selected.has(index) ? getMassnahmeRequires(kosten.id, selectedIds) : undefined;
+          const isDisabled = isBlocked || !!requiresLabel;
           return (
             <label
               key={index}
               className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                isBlocked
+                isDisabled
                   ? "border-border bg-muted/30 opacity-50 cursor-not-allowed"
                   : selected.has(index)
                     ? "border-primary bg-primary/5"
@@ -119,12 +136,12 @@ const ScenarioSimulator = ({
             >
               <Checkbox
                 checked={selected.has(index)}
-                onCheckedChange={() => !isBlocked && toggleSelection(index)}
-                disabled={isBlocked}
+                onCheckedChange={() => !isDisabled && toggleSelection(index)}
+                disabled={isDisabled}
                 className="mt-0.5"
               />
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${isBlocked ? "text-muted-foreground line-through" : "text-foreground"}`}>{rec.title}</p>
+                <p className={`text-sm font-medium ${isDisabled ? "text-muted-foreground line-through" : "text-foreground"}`}>{rec.title}</p>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary">{rec.category}</span>
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
@@ -149,6 +166,11 @@ const ScenarioSimulator = ({
                 {isBlocked && (
                   <p className="text-[10px] text-warning mt-1">
                     ⚠ Bereits enthalten in: {blockedBy}
+                  </p>
+                )}
+                {requiresLabel && (
+                  <p className="text-[10px] text-warning mt-1">
+                    ⚠ Setzt voraus: {requiresLabel}
                   </p>
                 )}
               </div>
