@@ -116,38 +116,72 @@ export function exportResultsPDF(result: SimulationResult) {
 
   const priorityLabel = (p: string) => p === "high" ? "Hoch" : p === "medium" ? "Mittel" : "Niedrig";
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [["Priorität", "Kategorie", "Empfehlung", "Auswirkung"]],
-    body: result.recommendations.map((r) => [
-      priorityLabel(r.priority),
-      r.category,
-      r.title,
-      r.impact,
-    ]),
-    headStyles: { fillColor: [58, 115, 87], fontSize: 9 },
-    bodyStyles: { fontSize: 9, cellPadding: 3 },
-    columnStyles: {
-      0: { cellWidth: 18 },
-      1: { cellWidth: 24 },
-      2: { cellWidth: 55 },
-      3: { cellWidth: "auto" },
-    },
-    alternateRowStyles: { fillColor: [245, 248, 245] },
-    didParseCell: (data: any) => {
-      if (data.section === "body" && data.column.index === 0) {
-        const val = data.cell.raw;
-        if (val === "Hoch") data.cell.styles.textColor = [200, 50, 50];
-        else if (val === "Mittel") data.cell.styles.textColor = [200, 140, 30];
-        else data.cell.styles.textColor = [120, 120, 120];
-        data.cell.styles.fontStyle = "bold";
-      }
-    },
-    theme: "grid",
+  // Render each recommendation as a block with context and prerequisites
+  result.recommendations.forEach((r) => {
+    if (y > 250) { doc.addPage(); y = margin; }
+
+    // Priority + Category header
+    const prioColor = r.priority === "high" ? [200, 50, 50] : r.priority === "medium" ? [200, 140, 30] : [120, 120, 120];
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(prioColor[0], prioColor[1], prioColor[2]);
+    doc.text(priorityLabel(r.priority).toUpperCase(), margin, y);
+    doc.setTextColor(58, 115, 87);
+    doc.text(` · ${r.category}`, margin + doc.getTextWidth(priorityLabel(r.priority).toUpperCase() + " "), y);
+    y += 5;
+
+    // Title
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    const titleLines = doc.splitTextToSize(r.title, pageWidth - 2 * margin);
+    doc.text(titleLines, margin, y);
+    y += titleLines.length * 4.5;
+
+    // Impact
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    const impactLines = doc.splitTextToSize(r.impact, pageWidth - 2 * margin);
+    doc.text(impactLines, margin, y);
+    y += impactLines.length * 4;
+
+    // Context
+    if (r.context) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(100, 100, 100);
+      const ctxLines = doc.splitTextToSize(r.context.replace(/\n/g, " "), pageWidth - 2 * margin - 4);
+      if (y + ctxLines.length * 3.5 > 270) { doc.addPage(); y = margin; }
+      doc.text(ctxLines, margin + 2, y);
+      y += ctxLines.length * 3.5;
+    }
+
+    // Prerequisites
+    if (r.prerequisites && r.prerequisites.length > 0) {
+      y += 2;
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(58, 115, 87);
+      doc.text("Voraussetzungen / nächste Schritte:", margin + 2, y);
+      y += 4;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80, 80, 80);
+      r.prerequisites.forEach((step, j) => {
+        if (y > 270) { doc.addPage(); y = margin; }
+        const stepLines = doc.splitTextToSize(`${j + 1}. ${step}`, pageWidth - 2 * margin - 8);
+        doc.text(stepLines, margin + 6, y);
+        y += stepLines.length * 3.5;
+      });
+    }
+
+    y += 6;
+    // Separator line
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, y - 3, pageWidth - margin, y - 3);
   });
 
-  y = (doc as any).lastAutoTable.finalY + 12;
+  y += 4;
 
   // ── Disclaimer ──
   if (y > 260) { doc.addPage(); y = margin; }

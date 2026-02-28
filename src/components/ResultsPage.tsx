@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
-import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home } from "lucide-react";
+import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { runSimulation, type SimulationResult, type SimulationInput } from "@/lib/simulation";
 import { exportResultsPDF } from "@/lib/pdf-export";
 
@@ -217,24 +218,57 @@ const ResultsPage = () => {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.5 + i * 0.1 }}
-                  className="flex items-start gap-3 p-4 bg-muted rounded-lg"
+                  className="bg-muted rounded-lg overflow-hidden"
                 >
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs font-semibold px-2 py-1 rounded bg-primary/10 text-primary whitespace-nowrap">
-                      {rec.category}
-                    </span>
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                      rec.priority === "high" ? "bg-destructive/10 text-destructive" :
-                      rec.priority === "medium" ? "bg-warning/10 text-warning" :
-                      "bg-muted-foreground/10 text-muted-foreground"
-                    }`}>
-                      {rec.priority === "high" ? "Hoch" : rec.priority === "medium" ? "Mittel" : "Niedrig"}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">{rec.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{rec.impact}</p>
-                  </div>
+                  <Collapsible>
+                    <CollapsibleTrigger className="w-full text-left p-4 flex items-start gap-3 hover:bg-muted/80 transition-colors group">
+                      <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                        <span className="text-xs font-semibold px-2 py-1 rounded bg-primary/10 text-primary whitespace-nowrap">
+                          {rec.category}
+                        </span>
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                          rec.priority === "high" ? "bg-destructive/10 text-destructive" :
+                          rec.priority === "medium" ? "bg-warning/10 text-warning" :
+                          "bg-muted-foreground/10 text-muted-foreground"
+                        }`}>
+                          {rec.priority === "high" ? "Hoch" : rec.priority === "medium" ? "Mittel" : "Niedrig"}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">{rec.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{rec.impact}</p>
+                      </div>
+                      {(rec.context || (rec.prerequisites && rec.prerequisites.length > 0)) && (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5 transition-transform group-data-[state=open]:rotate-180" />
+                      )}
+                    </CollapsibleTrigger>
+                    {(rec.context || (rec.prerequisites && rec.prerequisites.length > 0)) && (
+                      <CollapsibleContent>
+                        <div className="px-4 pb-4 pt-0 border-t border-border/50 mt-0">
+                          {rec.context && (
+                            <p className="text-xs text-muted-foreground mt-3 leading-relaxed whitespace-pre-line">
+                              {rec.context}
+                            </p>
+                          )}
+                          {rec.prerequisites && rec.prerequisites.length > 0 && (
+                            <div className="mt-3">
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <ListChecks className="h-3.5 w-3.5 text-primary" />
+                                <p className="text-xs font-semibold text-foreground">Voraussetzungen / nächste Schritte:</p>
+                              </div>
+                              <ol className="space-y-1.5 ml-5">
+                                {rec.prerequisites.map((step, j) => (
+                                  <li key={j} className="text-xs text-muted-foreground list-decimal leading-relaxed">
+                                    {step}
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    )}
+                  </Collapsible>
                 </motion.div>
               ))}
             </div>
