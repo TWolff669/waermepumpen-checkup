@@ -414,6 +414,7 @@ const ResultsPage = () => {
             aktuellerVerbrauch={result.actualConsumption || result.simulatedConsumption}
             aktuelleJAZ={result.jaz}
             flaecheM2={inputData ? Number(inputData.beheizteFlaeche) || 120 : 120}
+            personenAnzahl={inputData ? Number(inputData.personenAnzahl) || 4 : 4}
             plz={inputData?.postleitzahl || ""}
             foerderungenBund={result.foerderungen}
           />

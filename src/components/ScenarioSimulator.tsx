@@ -15,6 +15,7 @@ interface ScenarioSimulatorProps {
   aktuellerVerbrauch: number;
   aktuelleJAZ: number;
   flaecheM2: number;
+  personenAnzahl: number;
   plz: string;
   foerderungenBund: Foerdermittel[];
 }
@@ -25,6 +26,7 @@ const ScenarioSimulator = ({
   aktuellerVerbrauch,
   aktuelleJAZ,
   flaecheM2,
+  personenAnzahl,
   plz,
   foerderungenBund,
 }: ScenarioSimulatorProps) => {
@@ -60,8 +62,8 @@ const ScenarioSimulator = ({
 
   const szenario: SzenarioErgebnis | null = useMemo(() => {
     if (!showResults || selectedMassnahmen.length === 0) return null;
-    return berechneSzenario(selectedMassnahmen, strompreis, aktuellerVerbrauch, aktuelleJAZ, flaecheM2);
-  }, [showResults, selectedMassnahmen, strompreis, aktuellerVerbrauch, aktuelleJAZ, flaecheM2]);
+    return berechneSzenario(selectedMassnahmen, strompreis, aktuellerVerbrauch, aktuelleJAZ, flaecheM2, personenAnzahl);
+  }, [showResults, selectedMassnahmen, strompreis, aktuellerVerbrauch, aktuelleJAZ, flaecheM2, personenAnzahl]);
 
   // Regional funding for selected measures
   const regionaleFoerderungen = useMemo(() => {
