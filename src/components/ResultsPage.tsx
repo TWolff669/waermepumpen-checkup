@@ -67,10 +67,10 @@ const ResultsPage = () => {
           {/* Technical Details */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             {[
-              { icon: Zap, label: "JAZ Heizung", value: result.jaz.toFixed(2), unit: "" },
-              { icon: Droplets, label: "JAZ Warmwasser", value: result.jazWarmwasser.toFixed(2), unit: "" },
-              { icon: Thermometer, label: "Vorlauftemp.", value: `${result.vorlauftemperatur}`, unit: "°C" },
-              { icon: Home, label: "Heizwärmebedarf", value: `${result.specificHeatDemand}`, unit: "kWh/m²" },
+              { icon: Zap, label: "JAZ Heizung", value: (result.jaz ?? 0).toFixed(2), unit: "" },
+              { icon: Droplets, label: "JAZ Warmwasser", value: (result.jazWarmwasser ?? 0).toFixed(2), unit: "" },
+              { icon: Thermometer, label: "Vorlauftemp.", value: `${result.vorlauftemperatur ?? 0}`, unit: "°C" },
+              { icon: Home, label: "Heizwärmebedarf", value: `${result.specificHeatDemand ?? 0}`, unit: "kWh/m²" },
             ].map((item) => (
               <div key={item.label} className="bg-card rounded-lg border border-border p-4 text-center shadow-card">
                 <item.icon className="h-4 w-4 text-primary mx-auto mb-1.5" />
