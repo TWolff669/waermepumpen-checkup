@@ -1,97 +1,19 @@
 import { motion } from "framer-motion";
-import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2 } from "lucide-react";
+import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-
-interface ResultData {
-  score: number;
-  deviation: number;
-  simulatedConsumption: number;
-  actualConsumption: number;
-  isAdvanced: boolean;
-  recommendations: { category: string; title: string; impact: string }[];
-}
-
-const generateMockResults = (data: Record<string, unknown>): ResultData => {
-  const flaeche = Number(data.beheizteFlaeche) || 150;
-  const personen = Number(data.personenAnzahl) || 3;
-  const actualVerbrauch = Number(data.gesamtverbrauch) || 0;
-  const isAdvanced = Boolean(data.isAdvanced);
-
-  let baseConsumption = flaeche * 28;
-  const personFactor = 1 + (personen - 2) * 0.05;
-  baseConsumption = baseConsumption * personFactor;
-
-  // Advanced adjustments
-  if (isAdvanced) {
-    const vorlauf = Number(data.vorlauftemperatur) || 42;
-    if (vorlauf > 45) baseConsumption *= 1.12;
-    else if (vorlauf <= 35) baseConsumption *= 0.92;
-
-    const duschen = Number(data.duschenProTag) || 2;
-    baseConsumption += duschen * 350;
-
-    const raumtemp = Number(data.raumtemperatur) || 21;
-    baseConsumption *= 1 + (raumtemp - 21) * 0.06;
-
-    if (data.automatischeRaumregler === "ja") baseConsumption *= 0.95;
-    if (data.wpHeizkoerper === "ja") baseConsumption *= 0.93;
-  }
-
-  const simulatedConsumption = Math.round(baseConsumption);
-  const actual = actualVerbrauch || simulatedConsumption * (1 + (Math.random() * 0.4 - 0.1));
-  const deviation = actual > 0 ? Math.round(((actual - simulatedConsumption) / simulatedConsumption) * 100) : 0;
-  const score = Math.max(0, Math.min(100, 100 - Math.abs(deviation) * 2));
-
-  const recommendations: { category: string; title: string; impact: string }[] = [];
-
-  if (isAdvanced) {
-    const vorlauf = Number(data.vorlauftemperatur) || 42;
-    if (vorlauf > 45) {
-      recommendations.push({ category: "Einstellungen", title: "Vorlauftemperatur auf max. 42°C senken", impact: "Bis zu 12% Einsparung möglich" });
-    }
-    if (data.automatischeRaumregler === "nein") {
-      recommendations.push({ category: "Investition", title: "Smarte Thermostate nachrüsten", impact: "5% Effizienzgewinn durch raumweise Regelung" });
-    }
-    const raumtemp = Number(data.raumtemperatur) || 21;
-    if (raumtemp > 21) {
-      recommendations.push({ category: "Verhalten", title: `Raumtemperatur von ${raumtemp}°C auf 21°C senken`, impact: `Ca. ${Math.round((raumtemp - 21) * 6)}% Einsparung` });
-    }
-    const duschen = Number(data.duschenProTag) || 2;
-    if (duschen > 3) {
-      recommendations.push({ category: "Warmwasser", title: "Warmwasserbedarf optimieren", impact: "Hoher WW-Verbrauch erhöht Stromkosten deutlich" });
-    }
-    if (data.wpHeizkoerper === "nein") {
-      recommendations.push({ category: "Investition", title: "Wärmepumpenheizkörper in Betracht ziehen", impact: "Bis zu 7% Effizienzsteigerung" });
-    }
-  } else {
-    recommendations.push(
-      { category: "Einstellungen", title: "Vorlauftemperatur senken", impact: "Bis zu 10% Einsparung" },
-      { category: "Wartung", title: "Regelmäßige Filterkontrolle", impact: "3-5% Effizienzgewinn" },
-      { category: "Verhalten", title: "Nachtabsenkung optimieren", impact: "5-8% Einsparung" },
-    );
-  }
-
-  if (data.hydraulischerAbgleich === "nein") {
-    recommendations.unshift({ category: "Empfehlung", title: "Hydraulischen Abgleich durchführen lassen", impact: "Bis zu 15% Effizienzsteigerung" });
-  }
-
-  if (Math.abs(deviation) > 25) {
-    recommendations.push({ category: "Fachplaner", title: "Fachplaner hinzuziehen", impact: "Professionelle Analyse empfohlen" });
-  }
-
-  return { score, deviation, simulatedConsumption, actualConsumption: Math.round(actual), isAdvanced, recommendations };
-};
+import { runSimulation, type SimulationResult, type SimulationInput } from "@/lib/simulation";
 
 const ResultsPage = () => {
   const navigate = useNavigate();
-  const [result, setResult] = useState<ResultData | null>(null);
+  const [result, setResult] = useState<SimulationResult | null>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("wp-check-data");
     if (!stored) { navigate("/efficiency-check"); return; }
-    setResult(generateMockResults(JSON.parse(stored)));
+    const data = JSON.parse(stored) as SimulationInput;
+    setResult(runSimulation(data));
   }, [navigate]);
 
   if (!result) return null;
@@ -139,11 +61,61 @@ const ResultsPage = () => {
               {isGood ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
               {isGood ? "Gute Effizienz" : isOk ? "Verbesserungspotenzial" : "Deutliches Verbesserungspotenzial"}
             </div>
+            <p className="text-xs text-muted-foreground mt-3">Klimaregion: {result.climateRegion}</p>
           </div>
 
-          {/* Comparison */}
+          {/* Technical Details */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            {[
+              { icon: Zap, label: "JAZ Heizung", value: result.jaz.toFixed(2), unit: "" },
+              { icon: Droplets, label: "JAZ Warmwasser", value: result.jazWarmwasser.toFixed(2), unit: "" },
+              { icon: Thermometer, label: "Vorlauftemp.", value: `${result.vorlauftemperatur}`, unit: "°C" },
+              { icon: Home, label: "Heizwärmebedarf", value: `${result.specificHeatDemand}`, unit: "kWh/m²" },
+            ].map((item) => (
+              <div key={item.label} className="bg-card rounded-lg border border-border p-4 text-center shadow-card">
+                <item.icon className="h-4 w-4 text-primary mx-auto mb-1.5" />
+                <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                <p className="text-lg font-bold font-mono text-foreground">
+                  {item.value}<span className="text-xs text-muted-foreground ml-0.5">{item.unit}</span>
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Energy Breakdown */}
           <div className="bg-card rounded-xl shadow-card border border-border p-6 mb-8">
-            <h2 className="text-lg font-semibold text-card-foreground mb-4">Verbrauchsvergleich</h2>
+            <h2 className="text-lg font-semibold text-card-foreground mb-4">Energiebilanz</h2>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Heizwärmebedarf</span>
+                  <span className="font-mono font-medium text-foreground">{result.heatingDemand.toLocaleString()} kWh</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full"
+                    style={{ width: `${(result.heatingDemand / (result.heatingDemand + result.hotWaterDemand)) * 100}%` }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Warmwasserbedarf</span>
+                  <span className="font-mono font-medium text-foreground">{result.hotWaterDemand.toLocaleString()} kWh</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-accent rounded-full"
+                    style={{ width: `${(result.hotWaterDemand / (result.heatingDemand + result.hotWaterDemand)) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Consumption Comparison */}
+          <div className="bg-card rounded-xl shadow-card border border-border p-6 mb-8">
+            <h2 className="text-lg font-semibold text-card-foreground mb-4">Stromverbrauch WP</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-muted rounded-lg text-center">
                 <p className="text-sm text-muted-foreground mb-1">Simuliert (Optimum)</p>
@@ -175,9 +147,18 @@ const ResultsPage = () => {
                   transition={{ delay: 0.5 + i * 0.1 }}
                   className="flex items-start gap-3 p-4 bg-muted rounded-lg"
                 >
-                  <span className="text-xs font-semibold px-2 py-1 rounded bg-primary/10 text-primary whitespace-nowrap">
-                    {rec.category}
-                  </span>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs font-semibold px-2 py-1 rounded bg-primary/10 text-primary whitespace-nowrap">
+                      {rec.category}
+                    </span>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      rec.priority === "high" ? "bg-destructive/10 text-destructive" :
+                      rec.priority === "medium" ? "bg-warning/10 text-warning" :
+                      "bg-muted-foreground/10 text-muted-foreground"
+                    }`}>
+                      {rec.priority === "high" ? "Hoch" : rec.priority === "medium" ? "Mittel" : "Niedrig"}
+                    </span>
+                  </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-foreground">{rec.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{rec.impact}</p>
@@ -189,7 +170,7 @@ const ResultsPage = () => {
 
           {/* Disclaimer */}
           <p className="text-xs text-muted-foreground text-center mb-6">
-            Hinweis: Diese Ergebnisse basieren auf einer vereinfachten Simulation und ersetzen keine professionelle Beratung durch einen Fachplaner.
+            Hinweis: Diese Ergebnisse basieren auf einer vereinfachten Simulation nach VDI 4650 / DIN V 18599 und ersetzen keine professionelle Beratung durch einen Energieberater oder Fachplaner.
           </p>
 
           {/* Actions */}
