@@ -11,11 +11,13 @@ import InfoTooltip from "@/components/InfoTooltip";
 const ResultsPage = () => {
   const navigate = useNavigate();
   const [result, setResult] = useState<SimulationResult | null>(null);
+  const [inputData, setInputData] = useState<SimulationInput | null>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("wp-check-data");
     if (!stored) { navigate("/efficiency-check"); return; }
     const data = JSON.parse(stored) as SimulationInput;
+    setInputData(data);
     setResult(runSimulation(data));
   }, [navigate]);
 
@@ -295,7 +297,7 @@ const ResultsPage = () => {
                 <Link to="/advanced-check"><Settings2 className="mr-1 h-4 w-4" /> Check verfeinern</Link>
               </Button>
             )}
-            <Button variant="hero" onClick={() => exportResultsPDF(result)}>
+            <Button variant="hero" onClick={() => exportResultsPDF(result, inputData ?? undefined)}>
               <Download className="mr-1 h-4 w-4" /> Als PDF herunterladen
             </Button>
           </div>
