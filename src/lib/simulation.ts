@@ -215,6 +215,10 @@ export interface Recommendation {
   title: string;
   impact: string;
   priority: "high" | "medium" | "low";
+  /** Optional prerequisite steps that must happen first */
+  prerequisites?: string[];
+  /** Optional follow-up context */
+  context?: string;
 }
 
 export function runSimulation(input: SimulationInput): SimulationResult {
@@ -330,27 +334,98 @@ function generateRecommendations(
 ): Recommendation[] {
   const recs: Recommendation[] = [];
 
-  // Vorlauftemperatur
+  const heizungstyp = input.heizungstyp || "flaechenheizung";
+  const heizkoerperZustand = input.heizkoerperZustand || "";
+  const hatFlaechenheizung = heizungstyp === "flaechenheizung";
+  const hatBestandsHK = heizungstyp === "heizkoerper" && heizkoerperZustand === "uebernommen";
+  const hatSanierteHK = heizungstyp === "heizkoerper" && heizkoerperZustand === "saniert";
+  const hatWPHeizkoerper = input.wpHeizkoerper === "ja";
+  const renovierungen = input.renovierungen || [];
+
+  // ─── Vorlauftemperatur ───────────────────────────────────────────
+  // Context-aware: you can't just lower VL temp if radiators can't handle it.
   if (params.vorlauftemp > 45) {
+    if (hatFlaechenheizung) {
+      // Flächenheizung can easily handle low VL temps
+      recs.push({
+        category: "Einstellungen",
+        title: `Vorlauftemperatur von ${params.vorlauftemp}°C auf 35°C senken`,
+        impact: `Bei Flächenheizung sind 35°C ausreichend. Geschätzte JAZ-Verbesserung um ca. ${Math.round((params.vorlauftemp - 35) * 2.5)}%.`,
+        priority: "high",
+        context: "Flächenheizungen (Fußboden/Wand) arbeiten bereits bei niedrigen Temperaturen effizient. Eine Absenkung ist meist ohne bauliche Maßnahmen möglich.",
+      });
+    } else if (hatWPHeizkoerper || hatSanierteHK) {
+      // WP-HK or new radiators can handle ~42°C
+      const targetTemp = hatWPHeizkoerper ? 42 : 45;
+      recs.push({
+        category: "Einstellungen",
+        title: `Vorlauftemperatur von ${params.vorlauftemp}°C auf ${targetTemp}°C senken`,
+        impact: `${hatWPHeizkoerper ? "WP-Heizkörper" : "Sanierte Heizkörper"} sind für niedrigere Vorlauftemperaturen ausgelegt. Ca. ${Math.round((params.vorlauftemp - targetTemp) * 2.5)}% Einsparung.`,
+        priority: "high",
+        context: hatWPHeizkoerper
+          ? "WP-Heizkörper haben große Übertragungsflächen und arbeiten effizient bei 42°C."
+          : "Prüfen Sie mit Ihrem Installateur, ob die Heizkörper bei der Sanierung korrekt dimensioniert wurden.",
+      });
+    } else if (hatBestandsHK) {
+      // OLD radiators: can't just lower temp — need a plan
+      const targetRealistic = Math.max(params.vorlauftemp - 5, 50);
+      if (params.vorlauftemp > 50) {
+        recs.push({
+          category: "Einstellungen",
+          title: `Vorlauftemperatur schrittweise von ${params.vorlauftemp}°C auf ${targetRealistic}°C testen`,
+          impact: `Bereits ${params.vorlauftemp - targetRealistic}°C weniger bringen ca. ${Math.round((params.vorlauftemp - targetRealistic) * 2.5)}% Einsparung.`,
+          priority: "medium",
+          context: "Senken Sie die Vorlauftemperatur in 2°C-Schritten ab und prüfen Sie jeweils über einige Tage, ob alle Räume noch warm werden. Nicht pauschal auf 42°C senken — Bestandsheizkörper sind dafür in der Regel nicht ausgelegt.",
+          prerequisites: [
+            "Heizkurve an der WP-Regelung anpassen (nicht nur Raumthermostat)",
+            "An kalten Tagen prüfen, ob Räume noch ausreichend warm werden",
+          ],
+        });
+      }
+
+      // Suggest upgrading radiators as the real solution
+      recs.push({
+        category: "Investition",
+        title: "Heizflächen vergrößern oder auf WP-Heizkörper umrüsten",
+        impact: `Ermöglicht Absenkung der Vorlauftemperatur auf 42°C und steigert die JAZ um bis zu ${Math.round((params.vorlauftemp - 42) * 2.5)}%.`,
+        priority: "high",
+        context: "Bestandsheizkörper wurden für 55-70°C Vorlauf ausgelegt. Für effiziente WP-Nutzung müssen die Heizflächen vergrößert werden — entweder durch größere Heizkörper, WP-Heizkörper (z.B. Ventilheizkörper Typ 33) oder Flächenheizung.",
+        prerequisites: [
+          "Heizlastberechnung (Raum für Raum) durch Fachplaner erstellen lassen",
+          "Prüfen, welche Räume zuerst getauscht werden sollten (Bad, Wohnzimmer sind oft kritisch)",
+          "Fördermöglichkeiten prüfen (BEG-Förderung für Heizungsoptimierung)",
+        ],
+      });
+    }
+  } else if (params.vorlauftemp > 35 && hatFlaechenheizung) {
     recs.push({
       category: "Einstellungen",
-      title: `Vorlauftemperatur von ${params.vorlauftemp}°C auf max. 42°C senken`,
-      impact: `Geschätzte JAZ-Verbesserung um ${Math.round((params.vorlauftemp - 42) * 0.5 * 10) / 10}%. Jedes Grad weniger spart ca. 2.5% Strom.`,
-      priority: "high",
+      title: `Vorlauftemperatur von ${params.vorlauftemp}°C auf 35°C optimieren`,
+      impact: `Bei Fußbodenheizung reichen meist 35°C. Ca. ${Math.round((params.vorlauftemp - 35) * 2.5)}% Einsparung möglich.`,
+      priority: "medium",
+      context: "Senken Sie die Heizkurve schrittweise ab. Bei gut gedämmten Neubauten sind sogar 30°C möglich.",
     });
   }
 
-  // Hydraulischer Abgleich
+  // ─── Hydraulischer Abgleich ──────────────────────────────────────
   if (input.hydraulischerAbgleich === "nein") {
+    const prereqs: string[] = [
+      "Fachbetrieb mit hydraulischem Abgleich beauftragen",
+    ];
+    if (hatBestandsHK) {
+      prereqs.push("Voreinstellbare Thermostatventile nachrüsten (falls nicht vorhanden)");
+    }
     recs.push({
       category: "Maßnahme",
       title: "Hydraulischen Abgleich durchführen lassen",
-      impact: "10-15% Effizienzsteigerung durch optimale Wärmeverteilung. Kosten: ca. 500-1.000€, oft förderfähig.",
+      impact: "10-15% Effizienzsteigerung durch optimale Wärmeverteilung. Kosten: ca. 500-1.000€.",
       priority: "high",
+      context: "Der hydraulische Abgleich stellt sicher, dass jeder Heizkörper genau die richtige Wassermenge erhält. Ohne ihn werden nahegelegene Räume überversorgt und entfernte unterversorgt. Förderfähig über BEG (bis zu 20%).",
+      prerequisites: prereqs,
     });
   }
 
-  // Room temperature (advanced)
+  // ─── Raumtemperatur (advanced) ───────────────────────────────────
   if (params.isAdvanced && params.raumtemp > 21) {
     const savings = Math.round((params.raumtemp - 21) * 6);
     recs.push({
@@ -358,70 +433,121 @@ function generateRecommendations(
       title: `Raumtemperatur von ${params.raumtemp}°C auf 21°C senken`,
       impact: `Ca. ${savings}% Heizkostenersparnis. Bereits 1°C weniger spart rund 6% Energie.`,
       priority: "medium",
+      context: "Senken Sie die Temperatur zunächst in selten genutzten Räumen. Schlafzimmer und Flur benötigen meist nur 18°C. Wohnräume können auf 21°C eingestellt werden.",
     });
   }
 
-  // Automatic controllers
+  // ─── Automatische Raumregler ─────────────────────────────────────
   if (input.automatischeRaumregler === "nein") {
     recs.push({
       category: "Investition",
       title: "Smarte Thermostate / automatische Raumregler nachrüsten",
       impact: "5% Einsparung durch bedarfsgerechte Raumregelung und automatische Nachtabsenkung.",
       priority: "medium",
+      context: "Smarte Thermostate ermöglichen raumweise Zeitprogramme und Absenkung bei Abwesenheit. Kosten: ca. 50-80€ pro Heizkörper, schnelle Amortisation.",
     });
   }
 
-  // WP-Heizkörper
-  if (input.heizungstyp === "heizkoerper" && input.wpHeizkoerper === "nein") {
+  // ─── WP-Heizkörper (nur wenn Bestandsheizkörper und noch nicht empfohlen) ──
+  if (hatBestandsHK && !hatWPHeizkoerper && params.vorlauftemp <= 45) {
+    // Nur empfehlen, wenn oben keine VL-Temp-Empfehlung den HK-Tausch schon abdeckt
     recs.push({
       category: "Investition",
-      title: "Wärmepumpenheizkörper in Betracht ziehen",
-      impact: "Ermöglicht niedrigere Vorlauftemperaturen und verbessert JAZ um bis zu 7%.",
+      title: "Einzelne kritische Heizkörper gegen WP-Heizkörper tauschen",
+      impact: "Ermöglicht niedrigere Vorlauftemperaturen in Problemräumen und verbessert die Gesamt-JAZ.",
       priority: "medium",
+      context: "Nicht immer müssen alle Heizkörper getauscht werden. Oft genügt es, die 2-3 am schlechtesten versorgten Räume (z.B. Bad, großer Wohnraum) umzurüsten.",
+      prerequisites: [
+        "Raumweise Heizlastberechnung, um die kritischen Räume zu identifizieren",
+        "Prüfung, ob vorhandene Rohrleitungen für größere Heizkörper ausreichen",
+      ],
     });
   }
 
-  // Hot water
+  // ─── Warmwasser ──────────────────────────────────────────────────
   if (params.duschenProTag && params.duschenProTag > 4) {
     recs.push({
       category: "Warmwasser",
       title: "Warmwasserverbrauch optimieren",
       impact: "Hoher WW-Bedarf belastet die WP erheblich. Sparbrausen und kürzere Duschzeiten helfen.",
       priority: "medium",
+      context: `Bei ${params.duschenProTag} Dusch-/Badevorgängen pro Tag ist der Warmwasseranteil am Stromverbrauch überdurchschnittlich hoch. Sparbrausen (6-8 l/min statt 12-15 l/min) können den WW-Bedarf um 30-40% senken.`,
     });
   }
 
-  // Building envelope for Altbau
+  // ─── Gebäudehülle ────────────────────────────────────────────────
   if (params.specificDemand > 100) {
+    const missing: { name: string; saving: string }[] = [];
+    if (!renovierungen.includes("fassade")) missing.push({ name: "Fassadendämmung", saving: "20-35 kWh/m²" });
+    if (!renovierungen.includes("dach")) missing.push({ name: "Dachdämmung", saving: "15-20 kWh/m²" });
+    if (!renovierungen.includes("fenster")) missing.push({ name: "Fenstererneuerung", saving: "10-18 kWh/m²" });
+    if (!renovierungen.includes("kellerdecke")) missing.push({ name: "Kellerdeckendämmung", saving: "8-12 kWh/m²" });
+
+    if (missing.length > 0) {
+      const totalSavingLow = missing.length * 12;
+      const totalSavingHigh = missing.length * 25;
+      recs.push({
+        category: "Gebäude",
+        title: `Energetische Sanierung: ${missing.map((m) => m.name).join(", ")}`,
+        impact: `Heizwärmebedarf (${params.specificDemand} kWh/m²) ist hoch. Mögliche Reduktion: ${totalSavingLow}-${totalSavingHigh} kWh/m².`,
+        priority: "high",
+        context: `Eine bessere Gebäudehülle reduziert nicht nur den Verbrauch, sondern ermöglicht auch niedrigere Vorlauftemperaturen — ein doppelter Effizienzgewinn für die WP.\n\nEinzelpotenziale:\n${missing.map((m) => `• ${m.name}: ${m.saving}`).join("\n")}`,
+        prerequisites: [
+          "Energieberatung (BAFA-gefördert, ca. 80% Zuschuss) durchführen lassen",
+          "Individuellen Sanierungsfahrplan (iSFP) erstellen lassen — erhöht Fördersätze um 5%",
+          "Maßnahmen in sinnvoller Reihenfolge planen (Dämmung vor Heizungstausch)",
+        ],
+      });
+    }
+  } else if (params.specificDemand > 70 && input.gebaeudetyp === "altbau") {
+    // Moderately high — suggest targeted measures
     const missing: string[] = [];
-    if (!(input.renovierungen || []).includes("fassade")) missing.push("Fassadendämmung");
-    if (!(input.renovierungen || []).includes("dach")) missing.push("Dachdämmung");
-    if (!(input.renovierungen || []).includes("fenster")) missing.push("Fenstererneuerung");
+    if (!renovierungen.includes("kellerdecke")) missing.push("Kellerdeckendämmung");
+    if (!renovierungen.includes("dach")) missing.push("Dachdämmung/oberste Geschossdecke");
     if (missing.length > 0) {
       recs.push({
         category: "Gebäude",
-        title: `Energetische Sanierung: ${missing.join(", ")}`,
-        impact: `Spezifischer Heizwärmebedarf (${params.specificDemand} kWh/m²) ist hoch. Sanierung kann ihn um 30-50% senken.`,
-        priority: "high",
+        title: `Gezielte Dämmung: ${missing.join(", ")}`,
+        impact: `Kostengünstige Maßnahmen mit schneller Amortisation. Heizwärmebedarf kann um 10-20 kWh/m² sinken.`,
+        priority: "medium",
+        context: "Kellerdecken- und Dachdämmung sind oft die wirtschaftlichsten Sanierungsmaßnahmen und können teilweise in Eigenleistung durchgeführt werden.",
       });
     }
   }
 
-  // Wartung
+  // ─── Pufferspeicher-Hinweis ──────────────────────────────────────
+  if (input.pufferspeicher === "ja" && hatFlaechenheizung) {
+    recs.push({
+      category: "Einstellungen",
+      title: "Notwendigkeit des Pufferspeichers prüfen",
+      impact: "Pufferspeicher verursacht Verluste (ca. 1-3% des Wärmebedarfs). Bei Fußbodenheizung oft nicht nötig.",
+      priority: "low",
+      context: "Fußbodenheizungen haben bereits eine große thermische Masse und dienen selbst als Puffer. Ein zusätzlicher Pufferspeicher kann die Effizienz verschlechtern. Prüfen Sie mit Ihrem Installateur, ob der Pufferspeicher deaktiviert oder entfernt werden kann.",
+    });
+  }
+
+  // ─── Wartung ─────────────────────────────────────────────────────
   recs.push({
     category: "Wartung",
     title: "Regelmäßige Wartung und Filterkontrolle",
     impact: "3-5% Effizienzgewinn. Empfohlen: jährliche Wartung durch Fachbetrieb.",
     priority: "low",
+    context: "Verschmutzte Luftfilter (bei Luft-WP), verkalkte Wärmetauscher oder zu wenig Kältemittel reduzieren die Leistung deutlich.",
   });
 
-  // Fachplaner bei sehr hoher Abweichung
+  // ─── Fachplaner ──────────────────────────────────────────────────
   if (Math.abs(params.deviation) > 30) {
     recs.push({
       category: "Fachplaner",
-      title: "Professionelle Analyse durch Fachplaner empfohlen",
-      impact: `Bei ${Math.abs(params.deviation)}% Abweichung vom Optimum sollte ein Energieberater die Anlage prüfen.`,
+      title: "Professionelle Analyse durch Energieberater empfohlen",
+      impact: `Bei ${Math.abs(params.deviation)}% Abweichung vom Optimum sollte ein zertifizierter Energieberater die Anlage prüfen.`,
       priority: "high",
+      context: "Eine so große Abweichung deutet auf systematische Probleme hin, die über einfache Einstellungsänderungen hinausgehen. Ein Energieberater kann die Anlage, die Hydraulik und die Regelung umfassend analysieren.",
+      prerequisites: [
+        "Energieberater über die Energieeffizienz-Expertenliste (www.energie-effizienz-experten.de) finden",
+        "BAFA-Förderung für Energieberatung beantragen (bis zu 80% Zuschuss)",
+        "Betriebsdaten (Zählerstände, Einstellungen) für den Berater dokumentieren",
+      ],
     });
   }
 
