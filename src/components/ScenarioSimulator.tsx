@@ -308,6 +308,12 @@ const ScenarioSimulator = ({
                     Durch Fördermittel kann sich diese Summe weiter verringern. Möglichkeiten dazu werden nachfolgend aufgezeigt.
                   </p>
                 </div>
+                <div className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-lg mt-2">
+                  <Info className="h-3.5 w-3.5 text-warning flex-shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Die Berechnung der Kosten ist als Richtpreis anzusehen und soll Ihnen ein ungefähres Budget aufzeigen. Fragen Sie beim Handwerker Ihres Vertrauens ein Angebot an.
+                  </p>
+                </div>
               </div>
 
               {/* Fördermöglichkeiten for selected measures */}
