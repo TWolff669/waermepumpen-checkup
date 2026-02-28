@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
+import InfoTooltip from "@/components/InfoTooltip";
 
 interface FormData {
   postleitzahl: string;
@@ -180,7 +181,7 @@ const EfficiencyCheckForm = () => {
                   <h2 className="text-2xl font-bold text-card-foreground">Wärmepumpe</h2>
                   <div className="grid gap-4">
                     <div>
-                      <Label htmlFor="wpLeistung">Wärmepumpenleistung (kW)</Label>
+                      <Label htmlFor="wpLeistung"><InfoTooltip term="Wärmepumpenleistung">Wärmepumpenleistung (kW)</InfoTooltip></Label>
                       <Input id="wpLeistung" type="number" placeholder="z.B. 10" value={data.wpLeistung} onChange={(e) => update("wpLeistung", e.target.value)} className="mt-1.5" />
                     </div>
                     <div>
@@ -197,7 +198,7 @@ const EfficiencyCheckForm = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label>Pufferspeicher vorhanden?</Label>
+                      <Label><InfoTooltip term="Pufferspeicher">Pufferspeicher vorhanden?</InfoTooltip></Label>
                       <RadioGroup value={data.pufferspeicher} onValueChange={(v) => update("pufferspeicher", v)} className="mt-2 flex gap-4">
                         <div className="flex items-center gap-2">
                           <RadioGroupItem value="ja" id="puffer-ja" />
@@ -222,7 +223,7 @@ const EfficiencyCheckForm = () => {
                       <RadioGroup value={data.heizungstyp} onValueChange={(v) => update("heizungstyp", v)} className="mt-2 space-y-2">
                         <div className="flex items-center gap-2">
                           <RadioGroupItem value="flaechenheizung" id="flaeche-h" />
-                          <Label htmlFor="flaeche-h" className="font-normal">Flächenheizung (Fußboden/Wand)</Label>
+                          <Label htmlFor="flaeche-h" className="font-normal"><InfoTooltip term="Flächenheizung">Flächenheizung (Fußboden/Wand)</InfoTooltip></Label>
                         </div>
                         <div className="flex items-center gap-2">
                           <RadioGroupItem value="heizkoerper" id="heizkoerper" />
@@ -246,7 +247,7 @@ const EfficiencyCheckForm = () => {
                       </motion.div>
                     )}
                     <div>
-                      <Label>Hydraulischer Abgleich durchgeführt?</Label>
+                      <Label><InfoTooltip term="Hydraulischer Abgleich">Hydraulischer Abgleich durchgeführt?</InfoTooltip></Label>
                       <RadioGroup value={data.hydraulischerAbgleich} onValueChange={(v) => update("hydraulischerAbgleich", v)} className="mt-2 flex gap-4">
                         <div className="flex items-center gap-2">
                           <RadioGroupItem value="ja" id="ha-ja" />
