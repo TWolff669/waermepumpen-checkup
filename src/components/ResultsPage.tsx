@@ -20,6 +20,8 @@ const ResultsPage = () => {
   const [inputData, setInputData] = useState<SimulationInput | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [historicBanner, setHistoricBanner] = useState<{ date: string; period: string; projectId: string } | null>(null);
+  const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
+  const [linkedProjectName, setLinkedProjectName] = useState<string | null>(null);
 
   useEffect(() => {
     const checkId = searchParams.get("check");
@@ -37,6 +39,15 @@ const ResultsPage = () => {
 
     const storedResult = sessionStorage.getItem("wp-check-result");
     const stored = sessionStorage.getItem("wp-check-data");
+    const storedProjectId = sessionStorage.getItem("wp-check-project-id");
+    const storedProjectName = sessionStorage.getItem("wp-check-project-name");
+
+    if (storedProjectId) {
+      setLinkedProjectId(storedProjectId);
+      setLinkedProjectName(storedProjectName);
+      sessionStorage.removeItem("wp-check-project-id");
+      sessionStorage.removeItem("wp-check-project-name");
+    }
 
     if (storedResult && stored) {
       setInputData(JSON.parse(stored) as SimulationInput);
@@ -442,7 +453,13 @@ const ResultsPage = () => {
             )}
             {user && inputData && (
               <Button variant="default" onClick={() => setSaveDialogOpen(true)}>
-                <Save className="mr-1 h-4 w-4" /> Projekt speichern
+                <Save className="mr-1 h-4 w-4" />
+                {linkedProjectId ? `Check zu "${linkedProjectName}" hinzufügen` : "Projekt speichern"}
+              </Button>
+            )}
+            {!user && (
+              <Button variant="outline" asChild>
+                <Link to="/auth">Anmelden um Ergebnisse zu speichern</Link>
               </Button>
             )}
             <Button variant="hero" onClick={() => exportResultsPDF(result, inputData ?? undefined)}>
@@ -457,6 +474,8 @@ const ResultsPage = () => {
               onOpenChange={setSaveDialogOpen}
               inputData={inputData}
               resultData={result}
+              preselectedProjectId={linkedProjectId}
+              preselectedProjectName={linkedProjectName}
             />
           )}
         </motion.div>

@@ -9,7 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,8 @@ const EfficiencyCheckForm = () => {
   const [data, setData] = useState<FormData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get("project");
 
   const update = (field: keyof FormData, value: string | string[]) => {
     setData((prev) => ({ ...prev, [field]: value }));
@@ -125,9 +128,15 @@ const EfficiencyCheckForm = () => {
   };
   const prev = () => setStep((s) => Math.max(s - 1, 0));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateStep(step)) return;
     sessionStorage.setItem("wp-check-data", JSON.stringify(data));
+    if (projectId) {
+      // Pass project info to results page
+      const { data: proj } = await supabase.from("projects").select("name").eq("id", projectId).single();
+      sessionStorage.setItem("wp-check-project-id", projectId);
+      sessionStorage.setItem("wp-check-project-name", proj?.name || "Projekt");
+    }
     navigate("/results");
   };
 
