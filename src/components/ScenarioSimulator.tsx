@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,13 @@ import { matchMassnahmeToRecommendation, berechneSzenario, getMassnahmeBlockedBy
 import { getRegionaleFoerderung, getRelevanteFoerderung, type Foerdermittel } from "@/lib/foerderung";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
+export interface SzenarioExportData {
+  szenario: SzenarioErgebnis;
+  selectedMassnahmen: MassnahmeKosten[];
+  foerderungenBund: Foerdermittel[];
+  foerderungenRegional: Foerdermittel[];
+}
+
 interface ScenarioSimulatorProps {
   recommendations: Recommendation[];
   strompreis: number; // €/kWh
@@ -18,6 +25,7 @@ interface ScenarioSimulatorProps {
   personenAnzahl: number;
   plz: string;
   foerderungenBund: Foerdermittel[];
+  onSzenarioChange?: (data: SzenarioExportData | null) => void;
 }
 
 const ScenarioSimulator = ({
@@ -29,6 +37,7 @@ const ScenarioSimulator = ({
   personenAnzahl,
   plz,
   foerderungenBund,
+  onSzenarioChange,
 }: ScenarioSimulatorProps) => {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showResults, setShowResults] = useState(false);
@@ -103,6 +112,22 @@ const ScenarioSimulator = ({
   }, [showResults, selectedMassnahmen, foerderungenBund]);
 
   const alleFoerderungen = [...relevantesBundesFoerderungen, ...regionaleFoerderungen];
+
+  // Notify parent of szenario state for PDF export
+  useEffect(() => {
+    if (onSzenarioChange) {
+      if (szenario) {
+        onSzenarioChange({
+          szenario,
+          selectedMassnahmen,
+          foerderungenBund: relevantesBundesFoerderungen,
+          foerderungenRegional: regionaleFoerderungen,
+        });
+      } else {
+        onSzenarioChange(null);
+      }
+    }
+  }, [szenario, selectedMassnahmen, relevantesBundesFoerderungen, regionaleFoerderungen, onSzenarioChange]);
 
   return (
     <div className="bg-card rounded-xl shadow-card border border-border p-6 mb-8">

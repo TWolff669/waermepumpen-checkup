@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { SimulationResult, SimulationInput } from "@/lib/simulation";
+import type { SzenarioExportData } from "@/components/ScenarioSimulator";
 
 // ─── Label helpers ─────────────────────────────────────────────────
 
@@ -130,7 +131,7 @@ function sectionTitle(doc: jsPDF, title: string, x: number, y: number): number {
 
 // ─── Main export ───────────────────────────────────────────────────
 
-export function exportResultsPDF(result: SimulationResult, input?: SimulationInput) {
+export function exportResultsPDF(result: SimulationResult, input?: SimulationInput, szenarioData?: SzenarioExportData) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 20;
@@ -445,6 +446,117 @@ export function exportResultsPDF(result: SimulationResult, input?: SimulationInp
     doc.line(margin, y - 3, pageWidth - margin, y - 3);
   });
   y += 4;
+
+  // ── Maßnahmen-Simulation (conditional) ──
+  if (szenarioData) {
+    const sz = szenarioData.szenario;
+
+    y = ensureSpace(doc, y, 50, margin);
+    y = sectionTitle(doc, "Kosten- & Amortisationsanalyse", margin, y);
+
+    // Table 1: Ausgewählte Maßnahmen
+    const massnahmenRows: string[][] = sz.ausgewaehlteMassnahmen.map((m) => [
+      m.label,
+      m.kostenMin === 0 && m.kostenMax === 0
+        ? "Kostenlos"
+        : `${m.kostenMin.toLocaleString("de-DE")}–${m.kostenMax.toLocaleString("de-DE")} €`,
+    ]);
+    massnahmenRows.push([
+      "Gesamt",
+      `${sz.gesamtkostenMin.toLocaleString("de-DE")}–${sz.gesamtkostenMax.toLocaleString("de-DE")} €`,
+    ]);
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["Maßnahme", "Geschätzte Kosten"]],
+      body: massnahmenRows,
+      headStyles: { fillColor: [PRIMARY[0], PRIMARY[1], PRIMARY[2]], fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      alternateRowStyles: { fillColor: [245, 248, 245] },
+      theme: "grid",
+      columnStyles: { 0: { fontStyle: "bold", cellWidth: 90 } },
+      didParseCell: (data) => {
+        // Bold the last row (Gesamt)
+        if (data.row.index === massnahmenRows.length - 1) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [230, 240, 230];
+        }
+      },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+
+    // Kennzahlen-Box
+    y = ensureSpace(doc, y, 28, margin);
+    doc.setFillColor(240, 248, 240);
+    doc.setDrawColor(PRIMARY[0], PRIMARY[1], PRIMARY[2]);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, y, pageWidth - 2 * margin, 24, 3, 3, "FD");
+
+    const boxCenterY = y + 12;
+    const col1 = margin + 8;
+    const col2 = margin + (pageWidth - 2 * margin) / 3;
+    const col3 = margin + 2 * (pageWidth - 2 * margin) / 3;
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text("Erwartete COP-Verbesserung", col1, boxCenterY - 4);
+    doc.text("Geschätzte jährl. Ersparnis", col2, boxCenterY - 4);
+    doc.text("Amortisation", col3, boxCenterY - 4);
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(PRIMARY[0], PRIMARY[1], PRIMARY[2]);
+    doc.text(`+${sz.effizienzgewinnGesamt}%`, col1, boxCenterY + 4);
+    doc.setTextColor(GREEN[0], GREEN[1], GREEN[2]);
+    doc.text(`~${sz.kostenersparnisJahr.toLocaleString("de-DE")} €/Jahr`, col2, boxCenterY + 4);
+    doc.setTextColor(WARN[0], WARN[1], WARN[2]);
+    doc.text(
+      sz.amortisationJahre > 0 ? `ca. ${sz.amortisationJahre} Jahre` : "sofort",
+      col3,
+      boxCenterY + 4
+    );
+    y += 30;
+
+    // Table 2: Fördermöglichkeiten for selected measures
+    const alleFoerderungen = [...szenarioData.foerderungenBund, ...szenarioData.foerderungenRegional];
+    if (alleFoerderungen.length > 0) {
+      y = ensureSpace(doc, y, 30, margin);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(40, 40, 40);
+      doc.text("Passende Förderprogramme", margin, y);
+      y += 5;
+
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        head: [["Programm", "Förderung", "Hinweis"]],
+        body: alleFoerderungen.map((f) => [
+          f.programm,
+          `${f.foerderquote > 0 ? `bis ${f.foerderquote}%` : ""}${f.maxBetrag ? ` (max. ${f.maxBetrag.toLocaleString("de-DE")} €)` : ""}`.trim() || "–",
+          f.hinweis,
+        ]),
+        headStyles: { fillColor: [PRIMARY[0], PRIMARY[1], PRIMARY[2]], fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        alternateRowStyles: { fillColor: [245, 248, 245] },
+        theme: "grid",
+        columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 35 } },
+      });
+      y = (doc as any).lastAutoTable.finalY + 4;
+    }
+
+    // Disclaimer for scenario section
+    y = ensureSpace(doc, y, 12, margin);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(130, 130, 130);
+    const scenarioDisclaimer = "Die Kostenschätzungen basieren auf Erfahrungswerten und aktuellen Marktpreisen (Stand 2025). Die tatsächlichen Kosten können je nach Region, Anlagengröße und Dienstleister abweichen. Förderbedingungen können sich ändern – prüfen Sie die aktuellen Richtlinien vor Antragstellung.";
+    const sdLines = doc.splitTextToSize(scenarioDisclaimer, pageWidth - 2 * margin);
+    doc.text(sdLines, margin, y);
+    y += sdLines.length * 3 + 6;
+  }
 
   // ── Fördermöglichkeiten ──
   if (result.foerderungen && result.foerderungen.length > 0) {

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks, Save, Info, Sun, Euro, Award, ExternalLink } from "lucide-react";
-import ScenarioSimulator from "@/components/ScenarioSimulator";
+import ScenarioSimulator, { type SzenarioExportData } from "@/components/ScenarioSimulator";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -20,6 +20,7 @@ const ResultsPage = () => {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [inputData, setInputData] = useState<SimulationInput | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [szenarioExport, setSzenarioExport] = useState<SzenarioExportData | null>(null);
   const [historicBanner, setHistoricBanner] = useState<{ date: string; period: string; projectId: string } | null>(null);
   const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
   const [linkedProjectName, setLinkedProjectName] = useState<string | null>(null);
@@ -417,6 +418,7 @@ const ResultsPage = () => {
             personenAnzahl={inputData ? Number(inputData.personenAnzahl) || 4 : 4}
             plz={inputData?.postleitzahl || ""}
             foerderungenBund={result.foerderungen}
+            onSzenarioChange={setSzenarioExport}
           />
 
           {/* Fördermöglichkeiten */}
@@ -514,7 +516,7 @@ const ResultsPage = () => {
                 {linkedProjectId ? `Check zu "${linkedProjectName}" hinzufügen` : "Projekt speichern"}
               </Button>
             )}
-            <Button variant="hero" onClick={() => exportResultsPDF(result, inputData ?? undefined)}>
+            <Button variant="hero" onClick={() => exportResultsPDF(result, inputData ?? undefined, szenarioExport ?? undefined)}>
               <Download className="mr-1 h-4 w-4" /> Als PDF herunterladen
             </Button>
           </div>
