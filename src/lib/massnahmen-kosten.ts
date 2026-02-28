@@ -35,6 +35,35 @@ export function berechneHeizkörperAnzahl(flaecheM2: number, personenAnzahl: num
 /**
  * Standard-Kostentabelle. IDs korrespondieren mit Recommendation-Kategorien/Titeln.
  */
+/**
+ * Ausschlussregeln: Wenn eine Maßnahme gewählt wird, werden bestimmte andere deaktiviert.
+ * Key = ausgewählte Maßnahme, Value = Array von IDs, die dann nicht mehr wählbar sind.
+ */
+export const MASSNAHMEN_EXCLUSIONS: Record<string, string[]> = {
+  // WP-Heizkörper beinhalten bereits niedrigere Vorlauftemperatur
+  heizkoerper_tausch: ["vorlauftemperatur_senken"],
+  // Vorlauftemperatur-Absenkung wird durch HK-Tausch überflüssig
+  vorlauftemperatur_senken: ["heizkoerper_tausch"],
+};
+
+/**
+ * Prüft, ob eine Maßnahme aufgrund der aktuellen Auswahl gesperrt ist.
+ * Gibt den Sperrgrund (Label der sperrenden Maßnahme) zurück, oder undefined.
+ */
+export function getMassnahmeBlockedBy(
+  massnahmeId: string,
+  selectedIds: string[]
+): string | undefined {
+  for (const selId of selectedIds) {
+    const exclusions = MASSNAHMEN_EXCLUSIONS[selId];
+    if (exclusions?.includes(massnahmeId)) {
+      const blocker = DEFAULT_MASSNAHMEN_KOSTEN.find(m => m.id === selId);
+      return blocker?.label;
+    }
+  }
+  return undefined;
+}
+
 export const DEFAULT_MASSNAHMEN_KOSTEN: MassnahmeKosten[] = [
   {
     id: "hydraulischer_abgleich",
@@ -54,7 +83,8 @@ export const DEFAULT_MASSNAHMEN_KOSTEN: MassnahmeKosten[] = [
     kostenMax: 2900,  // 2000 * 1.45
     einheit: "pro Stück",
     effizienzgewinnProzent: 18,
-    stromersparnisKwhBasis: 700,
+    // Niedrigere VLT durch WP-HK spart erheblich — Referenz 120m²
+    stromersparnisKwhBasis: 1800,
     kategorie: "Investition",
     /** Dynamische Stückzahl: siehe berechneHeizkörperAnzahl() */
     istProStueck: true,

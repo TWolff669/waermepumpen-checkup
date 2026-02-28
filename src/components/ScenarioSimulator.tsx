@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Calculator, TrendingUp, Clock, Euro, Award, ExternalLink, ChevronDown, Info } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { type Recommendation } from "@/lib/simulation";
-import { matchMassnahmeToRecommendation, berechneSzenario, type MassnahmeKosten, type SzenarioErgebnis } from "@/lib/massnahmen-kosten";
+import { matchMassnahmeToRecommendation, berechneSzenario, getMassnahmeBlockedBy, type MassnahmeKosten, type SzenarioErgebnis } from "@/lib/massnahmen-kosten";
 import { getRegionaleFoerderung, getRelevanteFoerderung, type Foerdermittel } from "@/lib/foerderung";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
@@ -60,6 +60,9 @@ const ScenarioSimulator = ({
       .filter((k): k is MassnahmeKosten => !!k);
   }, [selected, recWithCosts]);
 
+  // IDs of currently selected measures (for exclusion checks)
+  const selectedIds = useMemo(() => selectedMassnahmen.map(m => m.id), [selectedMassnahmen]);
+
   const szenario: SzenarioErgebnis | null = useMemo(() => {
     if (!showResults || selectedMassnahmen.length === 0) return null;
     return berechneSzenario(selectedMassnahmen, strompreis, aktuellerVerbrauch, aktuelleJAZ, flaecheM2, personenAnzahl);
@@ -100,46 +103,58 @@ const ScenarioSimulator = ({
 
       {/* Checkboxes */}
       <div className="space-y-2 mb-4">
-        {simulierbareMassnahmen.map(({ rec, index, kosten }) => (
-          <label
-            key={index}
-            className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-              selected.has(index)
-                ? "border-primary bg-primary/5"
-                : "border-border bg-muted/50 hover:bg-muted"
-            }`}
-          >
-            <Checkbox
-              checked={selected.has(index)}
-              onCheckedChange={() => toggleSelection(index)}
-              className="mt-0.5"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">{rec.title}</p>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary">{rec.category}</span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                  rec.priority === "high" ? "bg-destructive/10 text-destructive" :
-                  rec.priority === "medium" ? "bg-warning/10 text-warning" :
-                  "bg-muted-foreground/10 text-muted-foreground"
-                }`}>
-                  {rec.priority === "high" ? "Hoch" : rec.priority === "medium" ? "Mittel" : "Niedrig"}
-                </span>
-                {kosten && (
-                  <span className="text-[10px] text-muted-foreground">
-                    {kosten.kostenMin === 0 && kosten.kostenMax === 0
-                      ? "Kostenlos"
-                      : kosten.kostenMin === 0
-                        ? `bis ${kosten.kostenMax.toLocaleString()}€`
-                        : `${kosten.kostenMin.toLocaleString()}–${kosten.kostenMax.toLocaleString()}€`
-                    }
-                    {kosten.einheit !== "pauschal" && ` (${kosten.einheit})`}
+        {simulierbareMassnahmen.map(({ rec, index, kosten }) => {
+          const blockedBy = kosten ? getMassnahmeBlockedBy(kosten.id, selectedIds.filter(id => id !== kosten.id)) : undefined;
+          const isBlocked = !!blockedBy && !selected.has(index);
+          return (
+            <label
+              key={index}
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                isBlocked
+                  ? "border-border bg-muted/30 opacity-50 cursor-not-allowed"
+                  : selected.has(index)
+                    ? "border-primary bg-primary/5"
+                    : "border-border bg-muted/50 hover:bg-muted"
+              }`}
+            >
+              <Checkbox
+                checked={selected.has(index)}
+                onCheckedChange={() => !isBlocked && toggleSelection(index)}
+                disabled={isBlocked}
+                className="mt-0.5"
+              />
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium ${isBlocked ? "text-muted-foreground line-through" : "text-foreground"}`}>{rec.title}</p>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary">{rec.category}</span>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                    rec.priority === "high" ? "bg-destructive/10 text-destructive" :
+                    rec.priority === "medium" ? "bg-warning/10 text-warning" :
+                    "bg-muted-foreground/10 text-muted-foreground"
+                  }`}>
+                    {rec.priority === "high" ? "Hoch" : rec.priority === "medium" ? "Mittel" : "Niedrig"}
                   </span>
+                  {kosten && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {kosten.kostenMin === 0 && kosten.kostenMax === 0
+                        ? "Kostenlos"
+                        : kosten.kostenMin === 0
+                          ? `bis ${kosten.kostenMax.toLocaleString()}€`
+                          : `${kosten.kostenMin.toLocaleString()}–${kosten.kostenMax.toLocaleString()}€`
+                      }
+                      {kosten.einheit !== "pauschal" && ` (${kosten.einheit})`}
+                    </span>
+                  )}
+                </div>
+                {isBlocked && (
+                  <p className="text-[10px] text-warning mt-1">
+                    ⚠ Bereits enthalten in: {blockedBy}
+                  </p>
                 )}
               </div>
-            </div>
-          </label>
-        ))}
+            </label>
+          );
+        })}
       </div>
 
       {/* Simulate button */}
