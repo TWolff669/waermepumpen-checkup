@@ -18,6 +18,12 @@ const Header = () => {
           <Link to="/efficiency-check" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Effizienz-Check
           </Link>
+          <Link to="/impressum" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Impressum
+          </Link>
+          <Link to="/datenschutz" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Datenschutz
+          </Link>
         </nav>
       </div>
     </header>
