@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      checks: {
+        Row: {
+          check_date: string
+          created_at: string
+          heating_period: string | null
+          id: string
+          input_data: Json
+          is_advanced: boolean
+          project_id: string
+          result_data: Json
+        }
+        Insert: {
+          check_date?: string
+          created_at?: string
+          heating_period?: string | null
+          id?: string
+          input_data: Json
+          is_advanced?: boolean
+          project_id: string
+          result_data: Json
+        }
+        Update: {
+          check_date?: string
+          created_at?: string
+          heating_period?: string | null
+          id?: string
+          input_data?: Json
+          is_advanced?: boolean
+          project_id?: string
+          result_data?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null

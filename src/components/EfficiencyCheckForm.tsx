@@ -35,13 +35,14 @@ interface FormData {
   gesamtproduktion: string;
   abrechnungVon: string;
   abrechnungBis: string;
+  strompreis: string;
 }
 
 const initialData: FormData = {
   postleitzahl: "", beheizteFlaeche: "", gebaeudetyp: "", baujahr: "", renovierungen: [],
   wpLeistung: "", hersteller: "", personenAnzahl: "", abrechnungVorhanden: "", pufferspeicher: "",
   heizungstyp: "", heizkoerperZustand: "", hydraulischerAbgleich: "", gesamtverbrauch: "",
-  gesamtproduktion: "", abrechnungVon: "", abrechnungBis: "",
+  gesamtproduktion: "", abrechnungVon: "", abrechnungBis: "", strompreis: "",
 };
 
 const renovierungsOptionen = [
@@ -93,7 +94,7 @@ const EfficiencyCheckForm = () => {
       0: ["postleitzahl", "beheizteFlaeche", "gebaeudetyp", "baujahr", "renovierungen", "personenAnzahl"],
       1: ["wpLeistung", "hersteller", "pufferspeicher"],
       2: ["heizungstyp", "heizkoerperZustand", "hydraulischerAbgleich"],
-      3: ["abrechnungVorhanden", "gesamtverbrauch", "gesamtproduktion", "abrechnungVon", "abrechnungBis"],
+      3: ["abrechnungVorhanden", "gesamtverbrauch", "gesamtproduktion", "abrechnungVon", "abrechnungBis", "strompreis"],
     };
 
     const fields = stepFields[stepIndex];
@@ -395,6 +396,17 @@ const EfficiencyCheckForm = () => {
                         </div>
                       </motion.div>
                     )}
+                    <div>
+                      <Label htmlFor="strompreis">Wärmepumpenstromtarif (ct/kWh)</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">Optional – sonst Durchschnitt 30 ct/kWh</p>
+                      <div className="flex gap-2">
+                        {["25", "28", "30", "33"].map((v) => (
+                          <Button key={v} type="button" variant={data.strompreis === v ? "default" : "outline"} size="sm" onClick={() => update("strompreis", v)}>{v} ct</Button>
+                        ))}
+                        <Input id="strompreis" type="number" placeholder="Andere" value={!["25", "28", "30", "33"].includes(data.strompreis) ? data.strompreis : ""} onChange={(e) => update("strompreis", e.target.value)} className="w-24" />
+                      </div>
+                      <FieldError message={errors.strompreis} />
+                    </div>
                   </div>
                 </div>
               )}
