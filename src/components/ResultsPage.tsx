@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks, Save, Info, Sun, Euro, Award, ExternalLink } from "lucide-react";
+import ScenarioSimulator from "@/components/ScenarioSimulator";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -405,6 +406,17 @@ const ResultsPage = () => {
               ))}
             </div>
           </div>
+
+          {/* Maßnahmen-Szenario Simulator */}
+          <ScenarioSimulator
+            recommendations={result.recommendations}
+            strompreis={result.kostenAnalyse.strompreis / 100}
+            aktuellerVerbrauch={result.actualConsumption || result.simulatedConsumption}
+            aktuelleJAZ={result.jaz}
+            flaecheM2={inputData ? Number(inputData.beheizteFlaeche) || 120 : 120}
+            plz={inputData?.postleitzahl || ""}
+            foerderungenBund={result.foerderungen}
+          />
 
           {/* Fördermöglichkeiten */}
           {result.foerderungen && result.foerderungen.length > 0 && (
