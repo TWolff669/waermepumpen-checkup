@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { runSimulation, type SimulationResult, type SimulationInput } from "@/lib/simulation";
 import { exportResultsPDF } from "@/lib/pdf-export";
 import InfoTooltip from "@/components/InfoTooltip";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 const ResultsPage = () => {
   const navigate = useNavigate();
@@ -158,53 +159,93 @@ const ResultsPage = () => {
             })()}
           </div>
 
-          {/* Energy Breakdown */}
-          <div className="bg-card rounded-xl shadow-card border border-border p-6 mb-8">
-            <h2 className="text-lg font-semibold text-card-foreground mb-4">Energiebilanz</h2>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Heizwärmebedarf</span>
-                  <span className="font-mono font-medium text-foreground">{result.heatingDemand.toLocaleString()} kWh</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full"
-                    style={{ width: `${(result.heatingDemand / (result.heatingDemand + result.hotWaterDemand)) * 100}%` }}
+          {/* Interactive Charts */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+            {/* Energy Breakdown Pie */}
+            <div className="bg-card rounded-xl shadow-card border border-border p-6">
+              <h2 className="text-lg font-semibold text-card-foreground mb-4">Energiebilanz</h2>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "Heizung", value: result.heatingDemand },
+                      { name: "Warmwasser", value: result.hotWaterDemand },
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    <Cell fill="hsl(var(--primary))" />
+                    <Cell fill="hsl(var(--accent))" />
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => `${value.toLocaleString()} kWh`}
+                    contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
                   />
-                </div>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex justify-center gap-6 text-xs text-muted-foreground mt-2">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-primary inline-block" /> Heizung</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-accent inline-block" /> Warmwasser</span>
               </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Warmwasserbedarf</span>
-                  <span className="font-mono font-medium text-foreground">{result.hotWaterDemand.toLocaleString()} kWh</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-accent rounded-full"
-                    style={{ width: `${(result.hotWaterDemand / (result.heatingDemand + result.hotWaterDemand)) * 100}%` }}
+            </div>
+
+            {/* JAZ Comparison Bar */}
+            <div className="bg-card rounded-xl shadow-card border border-border p-6">
+              <h2 className="text-lg font-semibold text-card-foreground mb-4">JAZ-Vergleich</h2>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={[
+                    { name: "Heizung", jaz: result.jaz, ziel: 3.5 },
+                    { name: "Warmwasser", jaz: result.jazWarmwasser, ziel: 2.5 },
+                  ]}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                  <XAxis type="number" domain={[0, 5.5]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis type="category" dataKey="name" width={85} tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                    formatter={(value: number, name: string) => [value.toFixed(2), name === "jaz" ? "Ihr Wert" : "Zielwert"]}
                   />
-                </div>
-              </div>
+                  <Legend formatter={(value) => value === "jaz" ? "Ihr Wert" : "Zielwert"} />
+                  <Bar dataKey="jaz" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="ziel" fill="hsl(var(--muted-foreground) / 0.3)" radius={[0, 4, 4, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Consumption Comparison */}
+          {/* Consumption Comparison Bar Chart */}
           <div className="bg-card rounded-xl shadow-card border border-border p-6 mb-8">
             <h2 className="text-lg font-semibold text-card-foreground mb-4">Stromverbrauch WP</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-muted rounded-lg text-center">
-                <p className="text-sm text-muted-foreground mb-1">Simuliert (Optimum)</p>
-                <p className="text-2xl font-bold font-mono text-foreground">{result.simulatedConsumption.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">kWh/Jahr</p>
-              </div>
-              <div className="p-4 bg-muted rounded-lg text-center">
-                <p className="text-sm text-muted-foreground mb-1">Tatsächlich</p>
-                <p className="text-2xl font-bold font-mono text-foreground">{result.actualConsumption.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">kWh/Jahr</p>
-              </div>
-            </div>
-            <div className="mt-4 text-center space-y-1">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart
+                data={[
+                  { name: "Simuliert (Optimum)", value: result.simulatedConsumption },
+                  { name: "Tatsächlich", value: result.actualConsumption },
+                ]}
+                margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                <Tooltip
+                  formatter={(value: number) => [`${value.toLocaleString()} kWh`, "Verbrauch"]}
+                  contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={50}>
+                  <Cell fill="hsl(var(--primary))" />
+                  <Cell fill={result.deviation > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))"} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="mt-3 text-center space-y-1">
               <span className={`text-sm font-medium ${result.deviation > 0 ? "text-destructive" : "text-success"}`}>
                 {result.deviation > 0 ? "+" : ""}{result.deviation}% Abweichung
               </span>
