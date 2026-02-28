@@ -1,19 +1,32 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Zap, Menu } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Zap, Menu, User, LogOut, FolderOpen } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navLinks = [
   { to: "/", label: "Startseite" },
   { to: "/efficiency-check", label: "Effizienz-Check" },
   { to: "/blog", label: "Blog" },
-  { to: "/impressum", label: "Impressum" },
-  { to: "/datenschutz", label: "Datenschutz" },
 ];
 
 const Header = () => {
   const [open, setOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md">
@@ -32,6 +45,30 @@ const Header = () => {
               {link.label}
             </Link>
           ))}
+
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="max-w-[120px] truncate">{user.email}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate("/projekte")}>
+                  <FolderOpen className="mr-2 h-4 w-4" /> Meine Projekte
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" /> Abmelden
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="default" size="sm" asChild>
+              <Link to="/auth">Anmelden</Link>
+            </Button>
+          )}
         </nav>
 
         {/* Mobile */}
@@ -46,15 +83,28 @@ const Header = () => {
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <nav className="flex flex-col gap-4 mt-8">
               {navLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setOpen(false)}
-                  className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
-                >
+                <Link key={link.to} to={link.to} onClick={() => setOpen(false)}
+                  className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-2">
                   {link.label}
                 </Link>
               ))}
+              {user ? (
+                <>
+                  <Link to="/projekte" onClick={() => setOpen(false)}
+                    className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-2">
+                    Meine Projekte
+                  </Link>
+                  <button onClick={() => { handleSignOut(); setOpen(false); }}
+                    className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-2 text-left">
+                    Abmelden
+                  </button>
+                </>
+              ) : (
+                <Link to="/auth" onClick={() => setOpen(false)}
+                  className="text-base font-medium text-primary hover:text-foreground transition-colors py-2">
+                  Anmelden
+                </Link>
+              )}
             </nav>
           </SheetContent>
         </Sheet>

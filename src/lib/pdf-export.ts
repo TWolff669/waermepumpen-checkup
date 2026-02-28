@@ -188,23 +188,38 @@ export function exportResultsPDF(result: SimulationResult, input?: SimulationInp
   y = 48;
 
   // ── Score Gauge + Summary (side by side) ──
-  drawScoreGauge(doc, margin + 18, y + 18, 16, result.score);
+  const hasComparison = result.score !== -1;
 
-  doc.setTextColor(40, 40, 40);
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.text("Effizienz-Score", margin + 42, y + 6);
+  if (hasComparison) {
+    drawScoreGauge(doc, margin + 18, y + 18, 16, result.score);
 
-  const label = result.score >= 70 ? "Gute Effizienz" : result.score >= 40 ? "Verbesserungspotenzial" : "Deutliches Verbesserungspotenzial";
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 100, 100);
-  doc.text(label, margin + 42, y + 13);
-  doc.text(`Klimaregion: ${result.climateRegion}`, margin + 42, y + 19);
-  if (result.isAdvanced) doc.text("Erweiterter Check", margin + 42, y + 25);
-  if (result.isPartialPeriod) {
-    doc.setTextColor(200, 140, 30);
-    doc.text(`⚠ Daten aus ${result.measurementDays} Tagen hochgerechnet`, margin + 42, y + 31);
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Effizienz-Score", margin + 42, y + 6);
+
+    const label = result.score >= 70 ? "Gute Effizienz" : result.score >= 40 ? "Verbesserungspotenzial" : "Deutliches Verbesserungspotenzial";
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(label, margin + 42, y + 13);
+    doc.text(`Klimaregion: ${result.climateRegion}`, margin + 42, y + 19);
+    if (result.isAdvanced) doc.text("Erweiterter Check", margin + 42, y + 25);
+    if (result.isPartialPeriod) {
+      doc.setTextColor(200, 140, 30);
+      doc.text(`⚠ Daten aus ${result.measurementDays} Tagen hochgerechnet`, margin + 42, y + 31);
+    }
+  } else {
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Simulationsergebnisse", margin, y + 6);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text("Kein Ist-Verbrauch hinterlegt — kein Vergleich möglich", margin, y + 13);
+    doc.text(`Klimaregion: ${result.climateRegion}`, margin, y + 19);
+    if (result.isAdvanced) doc.text("Erweiterter Check", margin, y + 25);
   }
 
   y += 42;
@@ -309,26 +324,33 @@ export function exportResultsPDF(result: SimulationResult, input?: SimulationInp
     { value: result.hotWaterDemand, color: [100, 180, 220], label: `Warmwasser: ${result.hotWaterDemand.toLocaleString("de-DE")} kWh` },
   ]);
 
-  // Consumption comparison bar chart (right side)
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(60, 60, 60);
-  doc.text("Stromverbrauch Vergleich", pageWidth / 2 + 5, y);
+  // Consumption comparison bar chart (right side) - only if comparison available
+  if (hasComparison) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(60, 60, 60);
+    doc.text("Stromverbrauch Vergleich", pageWidth / 2 + 5, y);
 
-  const devColor = result.deviation > 0 ? RED : GREEN;
-  drawBarChart(doc, pageWidth / 2 + 5, y + 6, pageWidth / 2 - margin - 5, [
-    { label: "Simuliert", value: result.simulatedConsumption, color: PRIMARY },
-    { label: "Tatsächlich", value: result.actualConsumption, color: devColor },
-  ]);
+    const devColor = result.deviation > 0 ? RED : GREEN;
+    drawBarChart(doc, pageWidth / 2 + 5, y + 6, pageWidth / 2 - margin - 5, [
+      { label: "Simuliert", value: result.simulatedConsumption, color: PRIMARY },
+      { label: "Tatsächlich", value: result.actualConsumption, color: devColor },
+    ]);
 
-  // Deviation note
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(devColor[0], devColor[1], devColor[2]);
-  doc.text(
-    `Abweichung: ${result.deviation > 0 ? "+" : ""}${result.deviation}%`,
-    pageWidth / 2 + 50, y + 35
-  );
+    // Deviation note
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(devColor[0], devColor[1], devColor[2]);
+    doc.text(
+      `Abweichung: ${result.deviation > 0 ? "+" : ""}${result.deviation}%`,
+      pageWidth / 2 + 50, y + 35
+    );
+  } else {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text("Kein Ist-Verbrauch hinterlegt", pageWidth / 2 + 5, y + 10);
+  }
 
   y += 50;
 

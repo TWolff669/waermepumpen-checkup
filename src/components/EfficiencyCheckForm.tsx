@@ -14,6 +14,8 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import InfoTooltip from "@/components/InfoTooltip";
+import { efficiencyStepSchemas } from "@/lib/validations";
+import { z } from "zod";
 
 interface FormData {
   postleitzahl: string;
@@ -36,23 +38,10 @@ interface FormData {
 }
 
 const initialData: FormData = {
-  postleitzahl: "",
-  beheizteFlaeche: "",
-  gebaeudetyp: "",
-  baujahr: "",
-  renovierungen: [],
-  wpLeistung: "",
-  hersteller: "",
-  personenAnzahl: "",
-  abrechnungVorhanden: "",
-  pufferspeicher: "",
-  heizungstyp: "",
-  heizkoerperZustand: "",
-  hydraulischerAbgleich: "",
-  gesamtverbrauch: "",
-  gesamtproduktion: "",
-  abrechnungVon: "",
-  abrechnungBis: "",
+  postleitzahl: "", beheizteFlaeche: "", gebaeudetyp: "", baujahr: "", renovierungen: [],
+  wpLeistung: "", hersteller: "", personenAnzahl: "", abrechnungVorhanden: "", pufferspeicher: "",
+  heizungstyp: "", heizkoerperZustand: "", hydraulischerAbgleich: "", gesamtverbrauch: "",
+  gesamtproduktion: "", abrechnungVon: "", abrechnungBis: "",
 };
 
 const renovierungsOptionen = [
@@ -69,13 +58,23 @@ const herstellerOptionen = [
 
 const TOTAL_STEPS = 4;
 
+const FieldError = ({ message }: { message?: string }) => {
+  if (!message) return null;
+  return <p className="text-xs text-destructive mt-1">{message}</p>;
+};
+
 const EfficiencyCheckForm = () => {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<FormData>(initialData);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
   const update = (field: keyof FormData, value: string | string[]) => {
     setData((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
+    }
   };
 
   const toggleRenovierung = (id: string) => {
@@ -87,11 +86,46 @@ const EfficiencyCheckForm = () => {
     }));
   };
 
-  const next = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
+  const validateStep = (stepIndex: number): boolean => {
+    const schema = efficiencyStepSchemas[stepIndex];
+    // Get relevant fields for this step
+    const stepFields: Record<number, (keyof FormData)[]> = {
+      0: ["postleitzahl", "beheizteFlaeche", "gebaeudetyp", "baujahr", "renovierungen", "personenAnzahl"],
+      1: ["wpLeistung", "hersteller", "pufferspeicher"],
+      2: ["heizungstyp", "heizkoerperZustand", "hydraulischerAbgleich"],
+      3: ["abrechnungVorhanden", "gesamtverbrauch", "gesamtproduktion", "abrechnungVon", "abrechnungBis"],
+    };
+
+    const fields = stepFields[stepIndex];
+    const stepData: Record<string, any> = {};
+    fields.forEach((f) => { stepData[f] = data[f]; });
+
+    const result = schema.safeParse(stepData);
+    if (result.success) {
+      setErrors({});
+      return true;
+    }
+
+    const newErrors: Record<string, string> = {};
+    result.error.issues.forEach((issue) => {
+      const path = issue.path[0]?.toString();
+      if (path && !newErrors[path]) {
+        newErrors[path] = issue.message;
+      }
+    });
+    setErrors(newErrors);
+    return false;
+  };
+
+  const next = () => {
+    if (validateStep(step)) {
+      setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
+    }
+  };
   const prev = () => setStep((s) => Math.max(s - 1, 0));
 
   const handleSubmit = () => {
-    // Store data and navigate to results
+    if (!validateStep(step)) return;
     sessionStorage.setItem("wp-check-data", JSON.stringify(data));
     navigate("/results");
   };
@@ -106,43 +140,24 @@ const EfficiencyCheckForm = () => {
           <div className="flex items-center justify-between mb-3">
             {stepLabels.map((label, i) => (
               <div key={label} className="flex items-center gap-2">
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
-                    i < step
-                      ? "bg-primary text-primary-foreground"
-                      : i === step
-                      ? "gradient-hero text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
+                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                  i < step ? "bg-primary text-primary-foreground" : i === step ? "gradient-hero text-primary-foreground" : "bg-muted text-muted-foreground"
+                }`}>
                   {i < step ? <Check className="h-4 w-4" /> : i + 1}
                 </div>
-                <span className={`hidden sm:block text-sm font-medium ${i === step ? "text-foreground" : "text-muted-foreground"}`}>
-                  {label}
-                </span>
+                <span className={`hidden sm:block text-sm font-medium ${i === step ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
               </div>
             ))}
           </div>
           <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <motion.div
-              className="h-full gradient-hero rounded-full"
-              initial={false}
-              animate={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
-              transition={{ duration: 0.3 }}
-            />
+            <motion.div className="h-full gradient-hero rounded-full" initial={false} animate={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }} transition={{ duration: 0.3 }} />
           </div>
         </div>
 
         {/* Form Card */}
         <div className="bg-card rounded-xl shadow-elevated border border-border p-8">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={step}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.25 }}
-            >
+            <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
               {step === 0 && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-card-foreground">Gebäudedaten</h2>
@@ -150,10 +165,12 @@ const EfficiencyCheckForm = () => {
                     <div>
                       <Label htmlFor="plz">Postleitzahl</Label>
                       <Input id="plz" placeholder="z.B. 80331" value={data.postleitzahl} onChange={(e) => update("postleitzahl", e.target.value)} className="mt-1.5" />
+                      <FieldError message={errors.postleitzahl} />
                     </div>
                     <div>
                       <Label htmlFor="flaeche">Beheizte Fläche (m²)</Label>
                       <Input id="flaeche" type="number" placeholder="z.B. 150" value={data.beheizteFlaeche} onChange={(e) => update("beheizteFlaeche", e.target.value)} className="mt-1.5" />
+                      <FieldError message={errors.beheizteFlaeche} />
                     </div>
                     <div>
                       <Label>Gebäudetyp</Label>
@@ -167,16 +184,13 @@ const EfficiencyCheckForm = () => {
                           <Label htmlFor="altbau" className="font-normal">Altbau</Label>
                         </div>
                       </RadioGroup>
+                      <FieldError message={errors.gebaeudetyp} />
                     </div>
                     {data.gebaeudetyp && (
                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-1">
-                        <Label htmlFor="baujahr">
-                          <InfoTooltip term="Baujahr">Baujahr des Gebäudes</InfoTooltip>
-                        </Label>
+                        <Label htmlFor="baujahr"><InfoTooltip term="Baujahr">Baujahr des Gebäudes</InfoTooltip></Label>
                         <Select value={data.baujahr} onValueChange={(v) => update("baujahr", v)}>
-                          <SelectTrigger className="mt-1.5">
-                            <SelectValue placeholder="Baujahr wählen" />
-                          </SelectTrigger>
+                          <SelectTrigger className="mt-1.5"><SelectValue placeholder="Baujahr wählen" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="vor1960">Vor 1960</SelectItem>
                             <SelectItem value="1960-1978">1960–1978</SelectItem>
@@ -186,6 +200,7 @@ const EfficiencyCheckForm = () => {
                             <SelectItem value="ab2016">Ab 2016 (EnEV 2016 / GEG)</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FieldError message={errors.baujahr} />
                       </motion.div>
                     )}
                     {data.gebaeudetyp === "altbau" && (
@@ -202,6 +217,7 @@ const EfficiencyCheckForm = () => {
                     <div>
                       <Label htmlFor="personen">Anzahl Personen im Haushalt</Label>
                       <Input id="personen" type="number" placeholder="z.B. 4" value={data.personenAnzahl} onChange={(e) => update("personenAnzahl", e.target.value)} className="mt-1.5" />
+                      <FieldError message={errors.personenAnzahl} />
                     </div>
                   </div>
                 </div>
@@ -214,19 +230,19 @@ const EfficiencyCheckForm = () => {
                     <div>
                       <Label htmlFor="wpLeistung"><InfoTooltip term="Wärmepumpenleistung">Wärmepumpenleistung (kW)</InfoTooltip></Label>
                       <Input id="wpLeistung" type="number" placeholder="z.B. 10" value={data.wpLeistung} onChange={(e) => update("wpLeistung", e.target.value)} className="mt-1.5" />
+                      <FieldError message={errors.wpLeistung} />
                     </div>
                     <div>
                       <Label>Hersteller / Typ</Label>
                       <Select value={data.hersteller} onValueChange={(v) => update("hersteller", v)}>
-                        <SelectTrigger className="mt-1.5">
-                          <SelectValue placeholder="Hersteller wählen" />
-                        </SelectTrigger>
+                        <SelectTrigger className="mt-1.5"><SelectValue placeholder="Hersteller wählen" /></SelectTrigger>
                         <SelectContent>
                           {herstellerOptionen.map((h) => (
                             <SelectItem key={h} value={h.toLowerCase()}>{h}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FieldError message={errors.hersteller} />
                     </div>
                     <div>
                       <Label><InfoTooltip term="Pufferspeicher">Pufferspeicher vorhanden?</InfoTooltip></Label>
@@ -240,6 +256,7 @@ const EfficiencyCheckForm = () => {
                           <Label htmlFor="puffer-nein" className="font-normal">Nein</Label>
                         </div>
                       </RadioGroup>
+                      <FieldError message={errors.pufferspeicher} />
                     </div>
                   </div>
                 </div>
@@ -261,6 +278,7 @@ const EfficiencyCheckForm = () => {
                           <Label htmlFor="heizkoerper" className="font-normal">Heizkörper</Label>
                         </div>
                       </RadioGroup>
+                      <FieldError message={errors.heizungstyp} />
                     </div>
                     {data.heizungstyp === "heizkoerper" && (
                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
@@ -275,6 +293,7 @@ const EfficiencyCheckForm = () => {
                             <Label htmlFor="saniert" className="font-normal">Saniert / Neu</Label>
                           </div>
                         </RadioGroup>
+                        <FieldError message={errors.heizkoerperZustand} />
                       </motion.div>
                     )}
                     <div>
@@ -293,6 +312,7 @@ const EfficiencyCheckForm = () => {
                           <Label htmlFor="ha-unbekannt" className="font-normal">Unbekannt</Label>
                         </div>
                       </RadioGroup>
+                      <FieldError message={errors.hydraulischerAbgleich} />
                     </div>
                   </div>
                 </div>
@@ -314,94 +334,64 @@ const EfficiencyCheckForm = () => {
                           <Label htmlFor="ab-nein" className="font-normal">Nein</Label>
                         </div>
                       </RadioGroup>
+                      <FieldError message={errors.abrechnungVorhanden} />
                     </div>
                     {data.abrechnungVorhanden === "ja" && (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4">
-                        {/* Date range */}
                         <div>
-                          <Label>
-                            <InfoTooltip term="Abrechnungszeitraum">Abrechnungszeitraum</InfoTooltip>
-                          </Label>
-                          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-                            Geben Sie den Zeitraum Ihrer Abrechnung an. Bei weniger als 12 Monaten wird der Verbrauch automatisch hochgerechnet.
-                          </p>
+                          <Label><InfoTooltip term="Abrechnungszeitraum">Abrechnungszeitraum</InfoTooltip></Label>
+                          <p className="text-xs text-muted-foreground mt-0.5 mb-2">Bei weniger als 12 Monaten wird der Verbrauch automatisch hochgerechnet.</p>
                           <div className="flex gap-3 items-center">
                             <Popover>
                               <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    "w-[160px] justify-start text-left font-normal",
-                                    !data.abrechnungVon && "text-muted-foreground"
-                                  )}
-                                >
+                                <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !data.abrechnungVon && "text-muted-foreground")}>
                                   <CalendarIcon className="mr-2 h-4 w-4" />
                                   {data.abrechnungVon ? format(new Date(data.abrechnungVon), "dd.MM.yyyy") : "Von"}
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={data.abrechnungVon ? new Date(data.abrechnungVon) : undefined}
+                                <Calendar mode="single" selected={data.abrechnungVon ? new Date(data.abrechnungVon) : undefined}
                                   onSelect={(d) => update("abrechnungVon", d ? d.toISOString() : "")}
-                                  disabled={(date) => date > new Date()}
-                                  locale={de}
-                                  initialFocus
-                                  className={cn("p-3 pointer-events-auto")}
-                                />
+                                  disabled={(date) => date > new Date()} locale={de} initialFocus className={cn("p-3 pointer-events-auto")} />
                               </PopoverContent>
                             </Popover>
                             <span className="text-muted-foreground text-sm">bis</span>
                             <Popover>
                               <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    "w-[160px] justify-start text-left font-normal",
-                                    !data.abrechnungBis && "text-muted-foreground"
-                                  )}
-                                >
+                                <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !data.abrechnungBis && "text-muted-foreground")}>
                                   <CalendarIcon className="mr-2 h-4 w-4" />
                                   {data.abrechnungBis ? format(new Date(data.abrechnungBis), "dd.MM.yyyy") : "Bis"}
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={data.abrechnungBis ? new Date(data.abrechnungBis) : undefined}
+                                <Calendar mode="single" selected={data.abrechnungBis ? new Date(data.abrechnungBis) : undefined}
                                   onSelect={(d) => update("abrechnungBis", d ? d.toISOString() : "")}
-                                  disabled={(date) =>
-                                    date > new Date() ||
-                                    (data.abrechnungVon ? date < new Date(data.abrechnungVon) : false)
-                                  }
-                                  locale={de}
-                                  initialFocus
-                                  className={cn("p-3 pointer-events-auto")}
-                                />
+                                  disabled={(date) => date > new Date() || (data.abrechnungVon ? date < new Date(data.abrechnungVon) : false)}
+                                  locale={de} initialFocus className={cn("p-3 pointer-events-auto")} />
                               </PopoverContent>
                             </Popover>
                           </div>
+                          <FieldError message={errors.abrechnungVon || errors.abrechnungBis} />
                           {data.abrechnungVon && data.abrechnungBis && (() => {
                             const days = Math.round((new Date(data.abrechnungBis).getTime() - new Date(data.abrechnungVon).getTime()) / (1000 * 60 * 60 * 24));
                             const months = Math.round(days / 30.44 * 10) / 10;
                             return (
                               <p className={`text-xs mt-1.5 ${days < 330 ? "text-warning font-medium" : "text-muted-foreground"}`}>
-                                {days < 330
-                                  ? `⚠ ${months} Monate (${days} Tage) — Verbrauch wird auf 12 Monate hochgerechnet`
-                                  : `✓ ${months} Monate (${days} Tage)`}
+                                {days < 330 ? `⚠ ${months} Monate (${days} Tage) — Verbrauch wird auf 12 Monate hochgerechnet` : `✓ ${months} Monate (${days} Tage)`}
                               </p>
                             );
                           })()}
                         </div>
-
                         <div>
                           <Label htmlFor="verbrauch">Gesamtstromverbrauch WP im Zeitraum (kWh)</Label>
                           <Input id="verbrauch" type="number" placeholder="z.B. 4500" value={data.gesamtverbrauch} onChange={(e) => update("gesamtverbrauch", e.target.value)} className="mt-1.5" />
+                          <FieldError message={errors.gesamtverbrauch} />
                         </div>
                         <div>
                           <Label htmlFor="produktion">Gesamtwärmeproduktion im Zeitraum (kWh)</Label>
                           <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">Optional — falls auf der Abrechnung oder am WP-Display ablesbar</p>
                           <Input id="produktion" type="number" placeholder="z.B. 15000" value={data.gesamtproduktion} onChange={(e) => update("gesamtproduktion", e.target.value)} className="mt-1.5" />
+                          <FieldError message={errors.gesamtproduktion} />
                         </div>
                       </motion.div>
                     )}

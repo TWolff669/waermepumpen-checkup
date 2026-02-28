@@ -379,14 +379,22 @@ export function runSimulation(input: SimulationInput): SimulationResult {
     isPartialPeriod = isPartial;
     measurementDays = days;
   } else {
-    actualConsumption = Math.round(simulatedConsumption * (1 + (Math.random() * 0.3 - 0.05)));
+    // No actual consumption data: no comparison possible
+    actualConsumption = simulatedConsumption;
   }
 
-  const deviation = Math.round(
-    ((actualConsumption - simulatedConsumption) / simulatedConsumption) * 100
-  );
+  let deviation: number;
+  let score: number;
 
-  const score = Math.max(0, Math.min(100, 100 - Math.abs(deviation) * 1.5));
+  if (hasActual) {
+    deviation = Math.round(
+      ((actualConsumption - simulatedConsumption) / simulatedConsumption) * 100
+    );
+    score = Math.max(0, Math.min(100, 100 - Math.abs(deviation) * 1.5));
+  } else {
+    deviation = 0;
+    score = -1; // Marker: no comparison possible
+  }
 
   // ── Recommendations ──
   const recommendations = generateRecommendations(input, {
