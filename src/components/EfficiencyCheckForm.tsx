@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import { de } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import InfoTooltip from "@/components/InfoTooltip";
 
 interface FormData {
@@ -25,6 +30,8 @@ interface FormData {
   hydraulischerAbgleich: string;
   gesamtverbrauch: string;
   gesamtproduktion: string;
+  abrechnungVon: string;
+  abrechnungBis: string;
 }
 
 const initialData: FormData = {
@@ -42,6 +49,8 @@ const initialData: FormData = {
   hydraulischerAbgleich: "",
   gesamtverbrauch: "",
   gesamtproduktion: "",
+  abrechnungVon: "",
+  abrechnungBis: "",
 };
 
 const renovierungsOptionen = [
@@ -286,12 +295,90 @@ const EfficiencyCheckForm = () => {
                     </div>
                     {data.abrechnungVorhanden === "ja" && (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4">
+                        {/* Date range */}
                         <div>
-                          <Label htmlFor="verbrauch">Gesamtstromverbrauch WP (kWh/Jahr)</Label>
+                          <Label>
+                            <InfoTooltip term="Abrechnungszeitraum">Abrechnungszeitraum</InfoTooltip>
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+                            Geben Sie den Zeitraum Ihrer Abrechnung an. Bei weniger als 12 Monaten wird der Verbrauch automatisch hochgerechnet.
+                          </p>
+                          <div className="flex gap-3 items-center">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-[160px] justify-start text-left font-normal",
+                                    !data.abrechnungVon && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {data.abrechnungVon ? format(new Date(data.abrechnungVon), "dd.MM.yyyy") : "Von"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={data.abrechnungVon ? new Date(data.abrechnungVon) : undefined}
+                                  onSelect={(d) => update("abrechnungVon", d ? d.toISOString() : "")}
+                                  disabled={(date) => date > new Date()}
+                                  locale={de}
+                                  initialFocus
+                                  className={cn("p-3 pointer-events-auto")}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <span className="text-muted-foreground text-sm">bis</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-[160px] justify-start text-left font-normal",
+                                    !data.abrechnungBis && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {data.abrechnungBis ? format(new Date(data.abrechnungBis), "dd.MM.yyyy") : "Bis"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={data.abrechnungBis ? new Date(data.abrechnungBis) : undefined}
+                                  onSelect={(d) => update("abrechnungBis", d ? d.toISOString() : "")}
+                                  disabled={(date) =>
+                                    date > new Date() ||
+                                    (data.abrechnungVon ? date < new Date(data.abrechnungVon) : false)
+                                  }
+                                  locale={de}
+                                  initialFocus
+                                  className={cn("p-3 pointer-events-auto")}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          {data.abrechnungVon && data.abrechnungBis && (() => {
+                            const days = Math.round((new Date(data.abrechnungBis).getTime() - new Date(data.abrechnungVon).getTime()) / (1000 * 60 * 60 * 24));
+                            const months = Math.round(days / 30.44 * 10) / 10;
+                            return (
+                              <p className={`text-xs mt-1.5 ${days < 330 ? "text-warning font-medium" : "text-muted-foreground"}`}>
+                                {days < 330
+                                  ? `⚠ ${months} Monate (${days} Tage) — Verbrauch wird auf 12 Monate hochgerechnet`
+                                  : `✓ ${months} Monate (${days} Tage)`}
+                              </p>
+                            );
+                          })()}
+                        </div>
+
+                        <div>
+                          <Label htmlFor="verbrauch">Gesamtstromverbrauch WP im Zeitraum (kWh)</Label>
                           <Input id="verbrauch" type="number" placeholder="z.B. 4500" value={data.gesamtverbrauch} onChange={(e) => update("gesamtverbrauch", e.target.value)} className="mt-1.5" />
                         </div>
                         <div>
-                          <Label htmlFor="produktion">Gesamtwärmeproduktion (kWh/Jahr)</Label>
+                          <Label htmlFor="produktion">Gesamtwärmeproduktion im Zeitraum (kWh)</Label>
+                          <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">Optional — falls auf der Abrechnung oder am WP-Display ablesbar</p>
                           <Input id="produktion" type="number" placeholder="z.B. 15000" value={data.gesamtproduktion} onChange={(e) => update("gesamtproduktion", e.target.value)} className="mt-1.5" />
                         </div>
                       </motion.div>
