@@ -18,6 +18,9 @@ const Header = () => {
           <Link to="/efficiency-check" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Effizienz-Check
           </Link>
+          <Link to="/blog" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Blog
+          </Link>
           <Link to="/impressum" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Impressum
           </Link>
