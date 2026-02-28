@@ -17,6 +17,7 @@ import BlogArticle from "./pages/BlogArticle";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Projekte from "./pages/Projekte";
+import ProjectHistory from "./pages/ProjectHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/projekte" element={<Layout><Projekte /></Layout>} />
+            <Route path="/projekt/:id/verlauf" element={<Layout><ProjectHistory /></Layout>} />
             <Route path="*" element={<Layout><NotFound /></Layout>} />
           </Routes>
         </BrowserRouter>

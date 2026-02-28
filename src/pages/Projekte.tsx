@@ -1,11 +1,10 @@
 import { motion } from "framer-motion";
-import { Folder, Trash2, Calendar, ArrowRight } from "lucide-react";
+import { Folder, Trash2, Calendar, ArrowRight, ArrowUpRight, ArrowDownRight, Minus, History, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Header from "@/components/Header";
 import { useToast } from "@/hooks/use-toast";
 
 interface Project {
@@ -15,6 +14,20 @@ interface Project {
   is_advanced: boolean;
   created_at: string;
   result_data: any;
+}
+
+interface CheckSummary {
+  project_id: string;
+  check_count: number;
+  latest_score: number | null;
+  prev_score: number | null;
+  latest_period: string | null;
+}
+
+function getScore(resultData: any): number | null {
+  if (!resultData || typeof resultData !== 'object') return null;
+  const score = (resultData as any).score;
+  return typeof score === 'number' ? score : null;
 }
 
 const Projekte = () => {
@@ -36,6 +49,43 @@ const Projekte = () => {
     enabled: !!user,
   });
 
+  // Load check summaries for all projects
+  const { data: checkSummaries } = useQuery({
+    queryKey: ["check-summaries", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("checks")
+        .select("project_id, check_date, result_data, heating_period")
+        .order("check_date", { ascending: false });
+      if (error) throw error;
+
+      // Group by project
+      const map = new Map<string, CheckSummary>();
+      for (const c of (data || [])) {
+        const pid = c.project_id;
+        if (!map.has(pid)) {
+          const score = getScore(c.result_data);
+          map.set(pid, {
+            project_id: pid,
+            check_count: 1,
+            latest_score: score === -1 ? null : score,
+            prev_score: null,
+            latest_period: c.heating_period,
+          });
+        } else {
+          const s = map.get(pid)!;
+          s.check_count++;
+          if (s.prev_score === null && s.check_count === 2) {
+            const score = getScore(c.result_data);
+            s.prev_score = score === -1 ? null : score;
+          }
+        }
+      }
+      return map;
+    },
+    enabled: !!user,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("projects").delete().eq("id", id);
@@ -43,6 +93,7 @@ const Projekte = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["check-summaries"] });
       toast({ title: "Projekt gelöscht" });
     },
   });
@@ -63,7 +114,6 @@ const Projekte = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <div className="container max-w-2xl py-10">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-3xl font-bold text-foreground mb-8">Meine Projekte</h1>
@@ -82,51 +132,85 @@ const Projekte = () => {
           ) : (
             <div className="space-y-4">
               {projects.map((project) => {
-                const score = project.result_data?.score ?? null;
-                const scoreDisplay = score === -1 ? "–" : score;
+                const summary = checkSummaries?.get(project.id);
+                const checkCount = summary?.check_count || 0;
+                const latestScore = summary?.latest_score ?? (project.result_data?.score === -1 ? null : project.result_data?.score ?? null);
+                const prevScore = summary?.prev_score;
+                const scoreDisplay = latestScore === null ? "–" : latestScore;
+
+                // Trend indicator
+                let trendIcon = null;
+                if (latestScore !== null && prevScore !== null) {
+                  const diff = latestScore - prevScore;
+                  if (diff > 3) trendIcon = <ArrowUpRight className="h-4 w-4 text-success" />;
+                  else if (diff < -3) trendIcon = <ArrowDownRight className="h-4 w-4 text-destructive" />;
+                  else trendIcon = <Minus className="h-4 w-4 text-muted-foreground" />;
+                }
+
                 return (
                   <motion.div
                     key={project.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-card rounded-xl shadow-card border border-border p-5 flex items-center gap-4 hover:shadow-elevated transition-shadow cursor-pointer"
-                    onClick={() => loadProject(project)}
+                    className="bg-card rounded-xl shadow-card border border-border p-5 hover:shadow-elevated transition-shadow"
                   >
-                    <div className="flex-shrink-0">
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-lg font-mono font-bold text-lg ${
-                        score === null || score === -1 ? "bg-muted text-muted-foreground" :
-                        score >= 70 ? "bg-success/10 text-success" :
-                        score >= 40 ? "bg-warning/10 text-warning" :
-                        "bg-destructive/10 text-destructive"
-                      }`}>
-                        {scoreDisplay}
+                    <div className="flex items-center gap-4 cursor-pointer" onClick={() => loadProject(project)}>
+                      <div className="flex-shrink-0">
+                        <div className={`flex h-12 w-12 items-center justify-center rounded-lg font-mono font-bold text-lg ${
+                          latestScore === null ? "bg-muted text-muted-foreground" :
+                          latestScore >= 70 ? "bg-success/10 text-success" :
+                          latestScore >= 40 ? "bg-warning/10 text-warning" :
+                          "bg-destructive/10 text-destructive"
+                        }`}>
+                          {scoreDisplay}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">{project.name}</h3>
-                      {project.address && (
-                        <p className="text-sm text-muted-foreground truncate">{project.address}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(project.created_at).toLocaleDateString("de-DE")}
-                        </span>
-                        {project.is_advanced && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">Erweitert</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-foreground truncate">{project.name}</h3>
+                          {trendIcon}
+                        </div>
+                        {project.address && (
+                          <p className="text-sm text-muted-foreground truncate">{project.address}</p>
                         )}
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(project.created_at).toLocaleDateString("de-DE")}
+                          </span>
+                          {checkCount > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">{checkCount} Check{checkCount !== 1 ? "s" : ""}</span>
+                          )}
+                          {summary?.latest_period && (
+                            <span className="text-xs text-muted-foreground">{summary.latest_period}</span>
+                          )}
+                          {project.is_advanced && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent-foreground">Erweitert</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteMutation.mutate(project.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-muted-foreground" />
-                    </Button>
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50">
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/efficiency-check?project=${project.id}`)}>
+                        <Plus className="h-3 w-3 mr-1" /> Neuer Check
+                      </Button>
+                      {checkCount > 0 && (
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/projekt/${project.id}/verlauf`)}>
+                          <History className="h-3 w-3 mr-1" /> Verlauf
+                        </Button>
+                      )}
+                      <div className="flex-1" />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteMutation.mutate(project.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
                   </motion.div>
                 );
               })}
