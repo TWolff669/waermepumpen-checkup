@@ -50,6 +50,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/projekte" element={<Layout><Projekte /></Layout>} />
             <Route path="/projekt/:id/verlauf" element={<Layout><ProjectHistory /></Layout>} />
+            <Route path="/einstellungen" element={<Layout><NotFound /></Layout>} />
+            <Route path="/pricing" element={<Layout><NotFound /></Layout>} />
             <Route path="*" element={<Layout><NotFound /></Layout>} />
           </Routes>
         </BrowserRouter>

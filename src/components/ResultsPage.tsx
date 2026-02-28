@@ -516,6 +516,11 @@ const ResultsPage = () => {
                 {linkedProjectId ? `Check zu "${linkedProjectName}" hinzufügen` : "Projekt speichern"}
               </Button>
             )}
+            {!user && (
+              <Button variant="outline" asChild>
+                <Link to="/auth"><Save className="mr-1 h-4 w-4" /> Anmelden & speichern</Link>
+              </Button>
+            )}
             <Button variant="hero" onClick={() => exportResultsPDF(result, inputData ?? undefined, szenarioExport ?? undefined)}>
               <Download className="mr-1 h-4 w-4" /> Als PDF herunterladen
             </Button>
@@ -528,6 +533,7 @@ const ResultsPage = () => {
               onOpenChange={setSaveDialogOpen}
               inputData={inputData}
               resultData={result}
+              scenarioData={szenarioExport}
               preselectedProjectId={linkedProjectId}
               preselectedProjectName={linkedProjectName}
             />

@@ -55,6 +55,39 @@ export type Database = {
           },
         ]
       }
+      custom_cost_overrides: {
+        Row: {
+          cost_max: number
+          cost_min: number
+          created_at: string
+          id: string
+          massnahme_key: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cost_max: number
+          cost_min: number
+          created_at?: string
+          id?: string
+          massnahme_key: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cost_max?: number
+          cost_min?: number
+          created_at?: string
+          id?: string
+          massnahme_key?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -62,8 +95,10 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          max_projects: number
           role: Database["public"]["Enums"]["user_role"]
           tier: Database["public"]["Enums"]["user_tier"]
+          tier_expires_at: string | null
           updated_at: string
         }
         Insert: {
@@ -72,8 +107,10 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          max_projects?: number
           role?: Database["public"]["Enums"]["user_role"]
           tier?: Database["public"]["Enums"]["user_tier"]
+          tier_expires_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -82,8 +119,10 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          max_projects?: number
           role?: Database["public"]["Enums"]["user_role"]
           tier?: Database["public"]["Enums"]["user_tier"]
+          tier_expires_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -97,6 +136,7 @@ export type Database = {
           is_advanced: boolean
           name: string
           result_data: Json
+          scenario_data: Json | null
           updated_at: string
           user_id: string
         }
@@ -108,6 +148,7 @@ export type Database = {
           is_advanced?: boolean
           name: string
           result_data: Json
+          scenario_data?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -119,6 +160,7 @@ export type Database = {
           is_advanced?: boolean
           name?: string
           result_data?: Json
+          scenario_data?: Json | null
           updated_at?: string
           user_id?: string
         }
