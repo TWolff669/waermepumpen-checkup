@@ -19,6 +19,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Projekte from "./pages/Projekte";
 import ProjectHistory from "./pages/ProjectHistory";
 import Einstellungen from "./pages/Einstellungen";
+import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,7 +53,7 @@ const App = () => (
             <Route path="/projekte" element={<Layout><Projekte /></Layout>} />
             <Route path="/projekt/:id/verlauf" element={<Layout><ProjectHistory /></Layout>} />
             <Route path="/einstellungen" element={<Layout><Einstellungen /></Layout>} />
-            <Route path="/pricing" element={<Layout><NotFound /></Layout>} />
+            <Route path="/pricing" element={<Layout><Pricing /></Layout>} />
             <Route path="*" element={<Layout><NotFound /></Layout>} />
           </Routes>
         </BrowserRouter>
