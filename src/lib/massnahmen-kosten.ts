@@ -267,48 +267,64 @@ export const DEFAULT_MASSNAHMEN_KOSTEN: MassnahmeKosten[] = [
 ];
 
 /**
+ * Wendet Custom Cost Overrides auf die Standard-Maßnahmen an.
+ * Gibt ein neues Array zurück, bei dem kostenMin/kostenMax ersetzt werden.
+ */
+export function applyOverrides(
+  baseMassnahmen: MassnahmeKosten[],
+  overrides: { massnahme_key: string; cost_min: number; cost_max: number; notes: string | null }[]
+): MassnahmeKosten[] {
+  if (!overrides || overrides.length === 0) return baseMassnahmen;
+  const overrideMap = new Map(overrides.map(o => [o.massnahme_key, o]));
+  return baseMassnahmen.map(m => {
+    const override = overrideMap.get(m.id);
+    if (!override) return m;
+    return { ...m, kostenMin: override.cost_min, kostenMax: override.cost_max };
+  });
+}
+
+/**
  * Ordnet einer Empfehlung die passende Kostenschätzung zu, basierend auf Kategorie und Titelstichworten.
+ * Optional: overriddenMassnahmen nutzen statt DEFAULT_MASSNAHMEN_KOSTEN.
  */
 export function matchMassnahmeToRecommendation(
   recCategory: string,
-  recTitle: string
+  recTitle: string,
+  massnahmen?: MassnahmeKosten[]
 ): MassnahmeKosten | undefined {
+  const source = massnahmen ?? DEFAULT_MASSNAHMEN_KOSTEN;
+  const findInSource = (id: string) => source.find(m => m.id === id);
+
   const title = recTitle.toLowerCase();
   const cat = recCategory.toLowerCase();
 
-  if (cat === "maßnahme" && title.includes("hydraulisch")) return find("hydraulischer_abgleich");
-  if (cat === "heizstab" && title.includes("reduzieren")) return find("heizstab_optimierung");
-  if (cat === "diagnose" && title.includes("heizstab")) return find("heizstab_pruefen");
-  if (cat === "einstellungen" && title.includes("vorlauftemperatur")) return find("vorlauftemperatur_senken");
-  if (cat === "einstellungen" && title.includes("pufferspeicher")) return find("pufferspeicher_pruefen");
-  if (cat === "investition" && (title.includes("heizkörper") || title.includes("heizflächen"))) return find("heizkoerper_tausch");
-  if (cat === "investition" && title.includes("thermostat")) return find("smarte_thermostate");
-  if (cat === "verhalten" && title.includes("raumtemperatur")) return find("raumtemperatur_senken");
-  if (cat === "warmwasser") return find("warmwasser_optimierung");
+  if (cat === "maßnahme" && title.includes("hydraulisch")) return findInSource("hydraulischer_abgleich");
+  if (cat === "heizstab" && title.includes("reduzieren")) return findInSource("heizstab_optimierung");
+  if (cat === "diagnose" && title.includes("heizstab")) return findInSource("heizstab_pruefen");
+  if (cat === "einstellungen" && title.includes("vorlauftemperatur")) return findInSource("vorlauftemperatur_senken");
+  if (cat === "einstellungen" && title.includes("pufferspeicher")) return findInSource("pufferspeicher_pruefen");
+  if (cat === "investition" && (title.includes("heizkörper") || title.includes("heizflächen"))) return findInSource("heizkoerper_tausch");
+  if (cat === "investition" && title.includes("thermostat")) return findInSource("smarte_thermostate");
+  if (cat === "verhalten" && title.includes("raumtemperatur")) return findInSource("raumtemperatur_senken");
+  if (cat === "warmwasser") return findInSource("warmwasser_optimierung");
   if (cat === "gebäude" || cat === "gebaeude") {
     if (title.includes("fassade") && title.includes("dach") && title.includes("fenster")) {
-      // Combined building envelope — return fassade as primary
-      return find("fassadendaemmung");
+      return findInSource("fassadendaemmung");
     }
-    if (title.includes("fassade")) return find("fassadendaemmung");
-    if (title.includes("dach") || title.includes("geschossdecke")) return find("dachdaemmung");
-    if (title.includes("fenster")) return find("fenster_tausch");
-    if (title.includes("keller")) return find("kellerdeckendaemmung");
-    // Generic building envelope recommendation
-    return find("fassadendaemmung");
+    if (title.includes("fassade")) return findInSource("fassadendaemmung");
+    if (title.includes("dach") || title.includes("geschossdecke")) return findInSource("dachdaemmung");
+    if (title.includes("fenster")) return findInSource("fenster_tausch");
+    if (title.includes("keller")) return findInSource("kellerdeckendaemmung");
+    return findInSource("fassadendaemmung");
   }
   if (cat === "pv-anlage") {
-    if (title.includes("batterie")) return find("batteriespeicher");
-    return find("pv_anlage");
+    if (title.includes("batterie")) return findInSource("batteriespeicher");
+    return findInSource("pv_anlage");
   }
-  if (cat === "wartung") return find("wartung");
-  if (cat === "fachplaner") return find("energieberatung");
+  if (cat === "wartung") return findInSource("wartung");
+  if (cat === "fachplaner") return findInSource("energieberatung");
 
   return undefined;
-}
-
-function find(id: string): MassnahmeKosten | undefined {
-  return DEFAULT_MASSNAHMEN_KOSTEN.find(m => m.id === id);
 }
 
 /**
