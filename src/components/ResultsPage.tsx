@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks, Save, Info, Sun, Euro, Award, ExternalLink } from "lucide-react";
-import ScenarioSimulator, { type SzenarioExportData } from "@/components/ScenarioSimulator";
+import ScenarioSimulator, { type SzenarioExportData, type CostOverride } from "@/components/ScenarioSimulator";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { runSimulation, type SimulationResult, type SimulationInput } from "@/lib/simulation";
 import { exportResultsPDF } from "@/lib/pdf-export";
@@ -12,11 +13,12 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { useAuth } from "@/hooks/useAuth";
 import SaveProjectDialog from "@/components/SaveProjectDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { canCustomizeCosts } from "@/lib/tier-guard";
 
 const ResultsPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, tierProfile } = useAuth();
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [inputData, setInputData] = useState<SimulationInput | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -24,6 +26,22 @@ const ResultsPage = () => {
   const [historicBanner, setHistoricBanner] = useState<{ date: string; period: string; projectId: string } | null>(null);
   const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
   const [linkedProjectName, setLinkedProjectName] = useState<string | null>(null);
+
+  // Fetch cost overrides for eligible users
+  const canOverride = user && tierProfile && canCustomizeCosts(tierProfile.tier);
+  const { data: costOverrides } = useQuery({
+    queryKey: ["costOverrides", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("custom_cost_overrides")
+        .select("massnahme_key, cost_min, cost_max, notes")
+        .eq("user_id", user!.id);
+      if (error) return [] as CostOverride[];
+      return (data ?? []) as CostOverride[];
+    },
+    enabled: !!canOverride,
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     const checkId = searchParams.get("check");
@@ -419,6 +437,8 @@ const ResultsPage = () => {
             plz={inputData?.postleitzahl || ""}
             foerderungenBund={result.foerderungen}
             onSzenarioChange={setSzenarioExport}
+            costOverrides={canOverride ? costOverrides ?? null : null}
+            userTier={tierProfile?.tier}
           />
 
           {/* Fördermöglichkeiten */}

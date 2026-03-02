@@ -2,12 +2,22 @@ import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Calculator, TrendingUp, Clock, Euro, Award, ExternalLink, ChevronDown, Info } from "lucide-react";
+import { Calculator, TrendingUp, Clock, Euro, Award, ExternalLink, ChevronDown, Info, Settings } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { type Recommendation } from "@/lib/simulation";
-import { matchMassnahmeToRecommendation, berechneSzenario, getMassnahmeBlockedBy, getMassnahmeRequires, type MassnahmeKosten, type SzenarioErgebnis } from "@/lib/massnahmen-kosten";
+import { matchMassnahmeToRecommendation, berechneSzenario, getMassnahmeBlockedBy, getMassnahmeRequires, applyOverrides, DEFAULT_MASSNAHMEN_KOSTEN, type MassnahmeKosten, type SzenarioErgebnis } from "@/lib/massnahmen-kosten";
 import { getRegionaleFoerderung, getRelevanteFoerderung, type Foerdermittel } from "@/lib/foerderung";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { canCustomizeCosts, type UserTier } from "@/lib/tier-guard";
+
+export interface CostOverride {
+  massnahme_key: string;
+  cost_min: number;
+  cost_max: number;
+  notes: string | null;
+}
 
 export interface SzenarioExportData {
   szenario: SzenarioErgebnis;
@@ -26,6 +36,8 @@ interface ScenarioSimulatorProps {
   plz: string;
   foerderungenBund: Foerdermittel[];
   onSzenarioChange?: (data: SzenarioExportData | null) => void;
+  costOverrides?: CostOverride[] | null;
+  userTier?: UserTier;
 }
 
 const ScenarioSimulator = ({
@@ -38,18 +50,28 @@ const ScenarioSimulator = ({
   plz,
   foerderungenBund,
   onSzenarioChange,
+  costOverrides,
+  userTier,
 }: ScenarioSimulatorProps) => {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showResults, setShowResults] = useState(false);
+
+  // Apply overrides if user has access
+  const hasOverrides = costOverrides && costOverrides.length > 0 && userTier && canCustomizeCosts(userTier);
+  const overrideKeys = useMemo(() => new Set(costOverrides?.map(o => o.massnahme_key) ?? []), [costOverrides]);
+  const effectiveMassnahmen = useMemo(() => {
+    if (!hasOverrides || !costOverrides) return DEFAULT_MASSNAHMEN_KOSTEN;
+    return applyOverrides(DEFAULT_MASSNAHMEN_KOSTEN, costOverrides);
+  }, [hasOverrides, costOverrides]);
 
   // Map recommendations to cost data
   const recWithCosts = useMemo(() => {
     return recommendations.map((rec, i) => ({
       rec,
       index: i,
-      kosten: matchMassnahmeToRecommendation(rec.category, rec.title),
+      kosten: matchMassnahmeToRecommendation(rec.category, rec.title, effectiveMassnahmen),
     }));
-  }, [recommendations]);
+  }, [recommendations, effectiveMassnahmen]);
 
   const simulierbareMassnahmen = recWithCosts.filter(r => r.kosten && (r.kosten.stromersparnisKwhBasis > 0 || r.kosten.kostenMax > 0));
 
@@ -137,9 +159,19 @@ const ScenarioSimulator = ({
         </div>
         <h2 className="text-lg font-semibold text-card-foreground">Maßnahmen-Szenario</h2>
       </div>
-      <p className="text-xs text-muted-foreground mb-4">
+      <p className="text-xs text-muted-foreground mb-2">
         Wählen Sie die Empfehlungen aus, die Sie umsetzen möchten. Wir berechnen Kosten, Effizienzsteigerung und Amortisation.
       </p>
+
+      {/* Override info banner */}
+      {hasOverrides && (
+        <div className="flex items-center gap-2 mb-4 p-2.5 bg-info/10 border border-info/20 rounded-lg">
+          <Settings className="h-3.5 w-3.5 text-info flex-shrink-0" />
+          <p className="text-xs text-foreground">
+            Eigene Kostenparameter aktiv ({costOverrides!.length} von {DEFAULT_MASSNAHMEN_KOSTEN.length} Maßnahmen angepasst)
+          </p>
+        </div>
+      )}
 
       {/* Checkboxes */}
       <div className="space-y-2 mb-4">
@@ -186,6 +218,18 @@ const ScenarioSimulator = ({
                       }
                       {kosten.einheit !== "pauschal" && ` (${kosten.einheit})`}
                     </span>
+                  )}
+                  {kosten && hasOverrides && overrideKeys.has(kosten.id) && (
+                    <UiTooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="secondary" className="text-[9px] h-4 px-1.5 gap-0.5 bg-info/10 text-info border-info/20 cursor-help">
+                          <Settings className="h-2.5 w-2.5" /> Eigene Kosten
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Sie haben eigene Kostenparameter hinterlegt.<br />Ändern unter Einstellungen → Kostenparameter</p>
+                      </TooltipContent>
+                    </UiTooltip>
                   )}
                 </div>
                 {isBlocked && (
