@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks, Save, Info, Sun, Euro, Award, ExternalLink } from "lucide-react";
+import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks, Save, Info, Sun, Euro, Award, ExternalLink, Stethoscope, CalendarRange, Building2 } from "lucide-react";
 import ScenarioSimulator, { type SzenarioExportData, type CostOverride } from "@/components/ScenarioSimulator";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -158,6 +158,157 @@ const ResultsPage = () => {
               <p className="text-xs text-muted-foreground mt-3">Klimaregion: {result.climateRegion}</p>
             </div>
           )}
+
+          {/* Kurzdiagnose: Ursachenanalyse bei Abweichung / niedrigem Score */}
+          {hasComparison && inputData && (result.score < 70 || Math.abs(result.deviation) >= 20) && (() => {
+            type Ursache = {
+              icon: typeof Zap;
+              titel: string;
+              beschreibung: string;
+              wahrscheinlichkeit: "hoch" | "mittel" | "niedrig";
+              massnahme: string;
+            };
+            const ursachen: Ursache[] = [];
+            const dev = result.deviation;
+            const absDev = Math.abs(dev);
+
+            // 1. Heizstab
+            if (result.heizstabAnalyse && result.heizstabAnalyse.bewertung !== "gut") {
+              ursachen.push({
+                icon: Zap,
+                titel: `Heizstab-Einsatz (${result.heizstabAnalyse.anteilAmGesamtverbrauch}% Verbrauchsanteil)`,
+                beschreibung: `Der elektrische Heizstab arbeitet mit COP ≈ 1 und treibt den Stromverbrauch hoch. Mehrkosten ca. ${result.heizstabAnalyse.mehrkostenProJahr} €/Jahr.`,
+                wahrscheinlichkeit: result.heizstabAnalyse.bewertung === "kritisch" ? "hoch" : "mittel",
+                massnahme: "Heizkurve & Sperrzeiten prüfen, Heizstab nur als Notfallreserve aktivieren.",
+              });
+            } else if (inputData.heizstabVorhanden === "unbekannt" || (!inputData.isAdvanced && dev > 25)) {
+              ursachen.push({
+                icon: Zap,
+                titel: "Heizstab-Einsatz unbekannt",
+                beschreibung: "Ein häufig laufender Heizstab kann den Verbrauch um 15–40% erhöhen, ohne dass es sofort auffällt.",
+                wahrscheinlichkeit: dev > 40 ? "hoch" : "mittel",
+                massnahme: "Vertieften Check durchführen und Heizstab-Betriebsstunden am WP-Regler ablesen.",
+              });
+            }
+
+            // 2. Vorlauftemperatur
+            const vl = result.vorlauftemperatur;
+            const isFlaeche = inputData.heizungstyp === "flaechenheizung";
+            if ((isFlaeche && vl > 38) || (!isFlaeche && vl > 50)) {
+              ursachen.push({
+                icon: Thermometer,
+                titel: `Zu hohe Vorlauftemperatur (${vl}°C)`,
+                beschreibung: `Jedes Grad Vorlauf senkt die JAZ um ca. 2,5%. Aktuelle JAZ: ${result.jaz.toFixed(2)} (Ziel ≥ 3,5).`,
+                wahrscheinlichkeit: "hoch",
+                massnahme: isFlaeche
+                  ? "Heizkurve schrittweise absenken (max. 35°C bei Flächenheizung)."
+                  : "Hydraulischen Abgleich durchführen, ggf. größere Heizkörper installieren.",
+              });
+            }
+
+            // 3. Hydraulischer Abgleich
+            if (inputData.hydraulischerAbgleich === "nein") {
+              ursachen.push({
+                icon: Settings2,
+                titel: "Kein hydraulischer Abgleich",
+                beschreibung: "Ohne Abgleich werden Räume ungleichmäßig versorgt – die WP läuft länger und mit höherer VL-Temperatur.",
+                wahrscheinlichkeit: "mittel",
+                massnahme: "Hydraulischen Abgleich Verfahren B durch Fachbetrieb durchführen lassen (förderfähig).",
+              });
+            }
+
+            // 4. Zeitraum / Hochrechnung
+            if (result.isPartialPeriod) {
+              ursachen.push({
+                icon: CalendarRange,
+                titel: `Kurzer Abrechnungszeitraum (${result.measurementDays} Tage)`,
+                beschreibung: "Verbrauchsdaten wurden HGT-gewichtet auf 12 Monate hochgerechnet. Das kann das Ergebnis verzerren, besonders wenn nur Wintermonate erfasst sind.",
+                wahrscheinlichkeit: result.measurementDays < 120 ? "hoch" : "mittel",
+                massnahme: "Vollständige Jahresabrechnung (mind. 12 Monate) für präzises Ergebnis nachreichen.",
+              });
+            }
+
+            // 5. Gebäudedaten / Sanierungsstand
+            const renoCount = (inputData.renovierungen || []).length;
+            if (result.specificHeatDemand > 100 && renoCount < 2 && inputData.gebaeudetyp !== "neubau") {
+              ursachen.push({
+                icon: Building2,
+                titel: `Hoher spezifischer Wärmebedarf (${result.specificHeatDemand} kWh/m²)`,
+                beschreibung: "Die Gebäudehülle verliert viel Wärme – die WP muss mehr leisten und arbeitet außerhalb ihres Optimums.",
+                wahrscheinlichkeit: result.specificHeatDemand > 130 ? "hoch" : "mittel",
+                massnahme: "Dämmung von Dach, Fassade oder Kellerdecke prüfen. iSFP bringt 5% Förderbonus.",
+              });
+            }
+
+            // 6. Eingabedaten plausibel?
+            if (dev > 60) {
+              ursachen.push({
+                icon: Info,
+                titel: "Sehr große Abweichung – Eingabedaten prüfen",
+                beschreibung: `+${dev}% gegenüber Sollwert ist ungewöhnlich hoch. Häufige Ursachen: Verbrauch enthält auch Haushaltsstrom, falsche Wohnfläche oder Personenzahl, falsches Baujahr.`,
+                wahrscheinlichkeit: "hoch",
+                massnahme: "Sicherstellen, dass nur der WP-Stromzähler erfasst wurde. Eingaben in den Einstellungen überprüfen.",
+              });
+            } else if (dev < -30) {
+              ursachen.push({
+                icon: Info,
+                titel: "Verbrauch deutlich unter Sollwert",
+                beschreibung: `${dev}% ist überdurchschnittlich niedrig. Möglich: PV-Eigenverbrauch wurde abgezogen, Zählerstände unvollständig, oder Gebäude besser gedämmt als angegeben.`,
+                wahrscheinlichkeit: "mittel",
+                massnahme: "Zählerstände und Erfassungszeitraum verifizieren.",
+              });
+            }
+
+            if (ursachen.length === 0) return null;
+
+            return (
+              <div className="bg-card rounded-xl shadow-elevated border-2 border-warning/30 p-6 mb-8">
+                <div className="flex items-center gap-2.5 mb-1">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-warning/10">
+                    <Stethoscope className="h-4 w-4 text-warning" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-card-foreground">Kurzdiagnose</h2>
+                  <span className="ml-auto text-xs font-mono text-muted-foreground">
+                    Abweichung {dev > 0 ? "+" : ""}{dev}%
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4 ml-11">
+                  {result.score === 0
+                    ? "Score = 0/100 bedeutet: Ihr Verbrauch weicht stark vom Sollwert ab. Wahrscheinlichste Ursachen:"
+                    : "Die folgenden Faktoren erklären Ihren aktuellen Score am wahrscheinlichsten:"}
+                </p>
+                <div className="space-y-2">
+                  {ursachen.map((u, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 + i * 0.08 }}
+                      className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg"
+                    >
+                      <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-card border border-border">
+                        <u.icon className="h-4 w-4 text-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <p className="text-sm font-medium text-foreground">{u.titel}</p>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            u.wahrscheinlichkeit === "hoch" ? "bg-destructive/10 text-destructive" :
+                            u.wahrscheinlichkeit === "mittel" ? "bg-warning/10 text-warning" :
+                            "bg-muted-foreground/10 text-muted-foreground"
+                          }`}>
+                            {u.wahrscheinlichkeit === "hoch" ? "Sehr wahrscheinlich" : u.wahrscheinlichkeit === "mittel" ? "Möglich" : "Weniger wahrscheinlich"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{u.beschreibung}</p>
+                        <p className="text-xs text-foreground mt-1.5"><span className="font-semibold">→ </span>{u.massnahme}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Kostenanalyse Card */}
           {result.kostenAnalyse && (
