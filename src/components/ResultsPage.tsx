@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks, Save, Info, Sun, Euro, Award, ExternalLink } from "lucide-react";
+import { CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Download, Settings2, Thermometer, Droplets, Zap, Home, ChevronDown, ListChecks, Save, Info, Sun, Euro, Award, ExternalLink, Stethoscope, CalendarRange, Building2 } from "lucide-react";
 import ScenarioSimulator, { type SzenarioExportData, type CostOverride } from "@/components/ScenarioSimulator";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
