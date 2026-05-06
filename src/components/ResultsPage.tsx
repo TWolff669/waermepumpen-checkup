@@ -309,6 +309,8 @@ const ResultsPage = () => {
               </div>
             );
           })()}
+
+          {/* Kostenanalyse Card */}
           {result.kostenAnalyse && (
             <div className="bg-card rounded-xl shadow-elevated border border-border p-6 mb-8">
               <div className="flex items-center gap-2.5 mb-4">
